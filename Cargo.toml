@@ -1,0 +1,10 @@
+[package]
+name = "v8unpack-rs"
+version = "0.1.0"
+authors = ["Andreev Alexander <andreevlex.as@gmail.com>"]
+
+[dependencies]
+deflate = "0.7.17"
+byteorder = "1.2.1"
+hex = "0.3.1"
+clap = "2.28.0"
