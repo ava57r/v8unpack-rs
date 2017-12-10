@@ -1,10 +1,7 @@
 use std::fs;
-use std::io::BufReader;
-use std::io::Result;
+use std::io::{BufReader, Cursor, Error as ioError, ErrorKind as ioErrorKind, Result, SeekFrom};
 use std::io::prelude::*;
 use std::path;
-use std::io::SeekFrom;
-use std::io::Cursor;
 
 use byteorder::{LittleEndian, ReadBytesExt};
 use std::convert::AsMut;
@@ -40,9 +37,18 @@ impl FileHeader {
         }
     }
 
-    pub fn from_raw_parts(src: &mut BufReader<fs::File>) -> Result<FileHeader> {
+    pub fn from_raw_parts<R>(src: &mut R) -> Result<FileHeader>
+    where
+        R: Read + Seek,
+    {
         let mut buf = vec![];
-        src.take(Self::SIZE as u64).read_to_end(&mut buf)?;
+        let read_bytes = src.take(Self::SIZE as u64).read_to_end(&mut buf)?;
+        if read_bytes < Self::SIZE as usize {
+            return Err(ioError::new(
+                ioErrorKind::InvalidData,
+                "Слишком мало байт прочитано",
+            ));
+        }
 
         let mut rdr = Cursor::new(buf);
         let _next_page_addr = rdr.read_u32::<LittleEndian>()?;
@@ -115,9 +121,18 @@ impl fmt::Display for BlockHeader {
 impl BlockHeader {
     pub const SIZE: u32 = 1 + 1 + 8 + 1 + 8 + 1 + 8 + 1 + 1 + 1;
 
-    pub fn from_raw_parts(src: &mut BufReader<fs::File>) -> Result<BlockHeader> {
+    pub fn from_raw_parts<R>(src: &mut R) -> Result<BlockHeader>
+    where
+        R: Read + Seek,
+    {
         let mut buf = vec![];
-        src.take(Self::SIZE as u64).read_to_end(&mut buf)?;
+        let read_bytes = src.take(Self::SIZE as u64).read_to_end(&mut buf)?;
+        if read_bytes < Self::SIZE as usize {
+            return Err(ioError::new(
+                ioErrorKind::InvalidData,
+                "Слишком мало байт прочитано",
+            ));
+        }
 
         let mut rdr = Cursor::new(buf);
         let _eol_0d = rdr.read_u8()?;
@@ -227,6 +242,7 @@ impl Default for ElemAddr {
     }
 }
 
+#[allow(dead_code)]
 struct ElemHeaderBegin {
     date_creation: u64,
     date_modification: u64,
@@ -265,12 +281,12 @@ impl V8File {
         file_name: &str,
         dir_name: &str,
         bool_inflate: bool,
-        unpack_when_need: bool,
+        _unpack_when_need: bool,
     ) -> Result<bool> {
         let file = fs::File::open(file_name)?;
         let mut buf_reader = BufReader::new(file);
 
-        let fh = FileHeader::from_raw_parts(&mut buf_reader)?;
+        let _fh = FileHeader::from_raw_parts(&mut buf_reader)?;
         let bh = BlockHeader::from_raw_parts(&mut buf_reader)?;
 
         if !bh.is_correct() {
@@ -303,7 +319,10 @@ impl V8File {
             let elem_block_header = BlockHeader::from_raw_parts(&mut buf_reader)?;
 
             if !elem_block_header.is_correct() {
-                panic!("block is not block =)");
+                return Err(ioError::new(
+                    ioErrorKind::Other,
+                    "Прочитанный блок не является корректным v8_header",
+                ));
             }
 
             let elem_block_data = V8File::read_block_data(&mut buf_reader, &elem_block_header)?;
@@ -316,7 +335,7 @@ impl V8File {
 
             if cur_elem.elem_data_addr != V8_MAGIC_NUMBER {
                 buf_reader.seek(SeekFrom::Start(cur_elem.elem_data_addr as u64))?;
-                let result = V8File::process_data(&mut buf_reader, &elem_path)?;
+                let _result = V8File::process_data(&mut buf_reader, bool_inflate, &elem_path)?;
             }
         }
         Ok(true)
@@ -342,7 +361,10 @@ impl V8File {
 
             read_in_bytes += bytes_to_read;
             if read_b < bytes_to_read as usize {
-                panic!("it's bad!");
+                return Err(ioError::new(
+                    ioErrorKind::Other,
+                    "Прочитано слишком мало байт",
+                ));
             }
 
             result.extend(lbuf.iter());
@@ -359,7 +381,11 @@ impl V8File {
         Ok(result)
     }
 
-    pub fn process_data(src: &mut BufReader<fs::File>, elem_path: &path::PathBuf) -> Result<bool> {
+    pub fn process_data(
+        src: &mut BufReader<fs::File>,
+        _need_unpack: bool,
+        elem_path: &path::PathBuf,
+    ) -> Result<bool> {
         let header = BlockHeader::from_raw_parts(src)?;
         if !header.is_correct() {
             return Ok(false);
@@ -371,20 +397,37 @@ impl V8File {
             Err(_) => block_data,
         };
 
-        let mut elem_file = fs::File::create(elem_path.as_path())?;
-        elem_file.write_all(&out_data)?;
+        let is_v8file = {
+            let mut rdr = Cursor::new(&out_data);
+            V8File::is_v8file(&mut rdr)
+        };
+
+        if is_v8file {
+            // TODO:
+        } else {
+            let mut elem_file = fs::File::create(elem_path.as_path())?;
+            elem_file.write_all(&out_data)?;
+        }
 
         Ok(true)
     }
 
-    /*pub fn is_v8file(data: &Vec<u8>) -> bool {
-        // проверим чтобы длина файла не была меньше длины заголовка файла и заголовка блока адресов
-        if data.len() < (FileHeader::SIZE + BlockHeader::SIZE) as usize {
-            return false;
-        }
+    pub fn is_v8file<R>(reader: &mut R) -> bool
+    where
+        R: Read + Seek,
+    {
+        let _file_header = match FileHeader::from_raw_parts(reader) {
+            Ok(header) => header,
+            Err(_) => return false,
+        };
 
-        true
-    }*/
+        let block_header = match BlockHeader::from_raw_parts(reader) {
+            Ok(header) => header,
+            Err(_) => return false,
+        };
+
+        block_header.is_correct()
+    }
 }
 
 // (c) https://stackoverflow.com/questions/25428920/how-to-get-a-slice-as-an-array-in-rust
