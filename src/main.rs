@@ -3,6 +3,7 @@ extern crate byteorder;
 extern crate clap;
 extern crate deflate;
 extern crate hex;
+extern crate inflate;
 
 mod container;
 

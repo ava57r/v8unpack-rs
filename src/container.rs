@@ -15,6 +15,8 @@ use std::cmp;
 
 use std::fmt;
 
+use inflate;
+
 pub const V8_MAGIC_NUMBER: u32 = 0x7fffffff;
 
 #[derive(Debug, Default)]
@@ -310,10 +312,11 @@ impl V8File {
             };
             let elem_name = elem.get_name();
 
-            let elem_file = fs::File::create(p_dir.join(&elem_name).as_path())?;
+            let elem_path = p_dir.join(&elem_name);
 
             if cur_elem.elem_data_addr != V8_MAGIC_NUMBER {
-                // TODO: parse
+                buf_reader.seek(SeekFrom::Start(cur_elem.elem_data_addr as u64))?;
+                let result = V8File::process_data(&mut buf_reader, &elem_path)?;
             }
         }
         Ok(true)
@@ -355,6 +358,33 @@ impl V8File {
 
         Ok(result)
     }
+
+    pub fn process_data(src: &mut BufReader<fs::File>, elem_path: &path::PathBuf) -> Result<bool> {
+        let header = BlockHeader::from_raw_parts(src)?;
+        if !header.is_correct() {
+            return Ok(false);
+        }
+
+        let block_data = V8File::read_block_data(src, &header)?;
+        let out_data = match inflate::inflate_bytes(&block_data) {
+            Ok(inf_bytes) => inf_bytes,
+            Err(_) => block_data,
+        };
+
+        let mut elem_file = fs::File::create(elem_path.as_path())?;
+        elem_file.write_all(&out_data)?;
+
+        Ok(true)
+    }
+
+    /*pub fn is_v8file(data: &Vec<u8>) -> bool {
+        // проверим чтобы длина файла не была меньше длины заголовка файла и заголовка блока адресов
+        if data.len() < (FileHeader::SIZE + BlockHeader::SIZE) as usize {
+            return false;
+        }
+
+        true
+    }*/
 }
 
 // (c) https://stackoverflow.com/questions/25428920/how-to-get-a-slice-as-an-array-in-rust
