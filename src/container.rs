@@ -1,18 +1,34 @@
-use std::fs;
-use std::io::{BufReader, Cursor, Error as ioError, ErrorKind as ioErrorKind, Result, SeekFrom};
+use std::{cmp, fmt, fs, path, result, str, u32};
+use std::io::{BufReader, Cursor, Error as ioError, ErrorKind as ioErrorKind, SeekFrom};
 use std::io::prelude::*;
-use std::path;
 
 use byteorder::{LittleEndian, ReadBytesExt};
 use std::convert::AsMut;
 
-use std::u32;
-use std::str;
-use std::cmp;
-
-use std::fmt;
-
 use inflate;
+
+pub type Result<T> = result::Result<T, Error>;
+
+#[derive(Debug)]
+pub enum Error {
+    NotV8File,
+    IoError(ioError),
+}
+
+impl From<ioError> for Error {
+    fn from(other: ioError) -> Error {
+        Error::IoError(other)
+    }
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Error::IoError(ref e) => fmt::Display::fmt(e, f),
+            Error::NotV8File => write!(f, "Not correct V8 file"),
+        }
+    }
+}
 
 pub const V8_MAGIC_NUMBER: u32 = 0x7fffffff;
 
@@ -44,10 +60,10 @@ impl FileHeader {
         let mut buf = vec![];
         let read_bytes = src.take(Self::SIZE as u64).read_to_end(&mut buf)?;
         if read_bytes < Self::SIZE as usize {
-            return Err(ioError::new(
+            return Err(Error::IoError(ioError::new(
                 ioErrorKind::InvalidData,
                 "Слишком мало байт прочитано",
-            ));
+            )));
         }
 
         let mut rdr = Cursor::new(buf);
@@ -111,9 +127,7 @@ impl fmt::Display for BlockHeader {
         write!(
             f,
             "data_size_hex: {}\npage_size_hex: {}\nnext_page_addr_hex: {}",
-            data_size_hex,
-            page_size_hex,
-            next_page_addr_hex
+            data_size_hex, page_size_hex, next_page_addr_hex
         )
     }
 }
@@ -128,10 +142,10 @@ impl BlockHeader {
         let mut buf = vec![];
         let read_bytes = src.take(Self::SIZE as u64).read_to_end(&mut buf)?;
         if read_bytes < Self::SIZE as usize {
-            return Err(ioError::new(
+            return Err(Error::IoError(ioError::new(
                 ioErrorKind::InvalidData,
                 "Слишком мало байт прочитано",
-            ));
+            )));
         }
 
         let mut rdr = Cursor::new(buf);
@@ -255,6 +269,9 @@ impl ElemHeaderBegin {
 
 pub struct V8Elem {
     header: Vec<u8>,
+    data: Option<Vec<u8>>,
+    unpacked_data: Option<V8File>,
+    is_v8file: bool,
 }
 
 impl V8Elem {
@@ -274,7 +291,11 @@ impl V8Elem {
     }
 }
 
-pub struct V8File;
+pub struct V8File {
+    file_header: FileHeader,
+    elems_addrs: Vec<ElemAddr>,
+    elems: Vec<V8Elem>,
+}
 
 impl V8File {
     pub fn unpack_to_directory_no_load(
@@ -298,16 +319,7 @@ impl V8File {
             fs::create_dir(dir_name)?;
         }
 
-        // Читаем элементы
-        let block_data = V8File::read_block_data(&mut buf_reader, &bh)?;
-        let data_size = block_data.len() as u64;
-        let mut rdr = Cursor::new(block_data);
-
-        let mut elems_addrs: Vec<ElemAddr> = vec![];
-
-        while rdr.position() < data_size {
-            elems_addrs.push(ElemAddr::from_raw_parts(&mut rdr)?);
-        }
+        let elems_addrs = V8File::read_elems_addrs(&mut buf_reader, &bh)?;
 
         for cur_elem in elems_addrs.iter() {
             if cur_elem.fffffff != V8_MAGIC_NUMBER {
@@ -319,15 +331,15 @@ impl V8File {
             let elem_block_header = BlockHeader::from_raw_parts(&mut buf_reader)?;
 
             if !elem_block_header.is_correct() {
-                return Err(ioError::new(
-                    ioErrorKind::Other,
-                    "Прочитанный блок не является корректным v8_header",
-                ));
+                return Err(Error::NotV8File);
             }
 
             let elem_block_data = V8File::read_block_data(&mut buf_reader, &elem_block_header)?;
             let elem = V8Elem {
                 header: elem_block_data,
+                data: None,
+                unpacked_data: None,
+                is_v8file: false,
             };
             let elem_name = elem.get_name();
 
@@ -341,10 +353,27 @@ impl V8File {
         Ok(true)
     }
 
-    pub fn read_block_data(
-        src: &mut BufReader<fs::File>,
-        block_header: &BlockHeader,
-    ) -> Result<Vec<u8>> {
+    fn read_elems_addrs<R>(reader: &mut R, block_header: &BlockHeader) -> Result<Vec<ElemAddr>>
+    where
+        R: Read + Seek,
+    {
+        let block_data = V8File::read_block_data(reader, block_header)?;
+        let data_size = block_data.len() as u64;
+        let mut rdr = Cursor::new(block_data);
+
+        let mut elems_addrs: Vec<ElemAddr> = vec![];
+
+        while rdr.position() < data_size {
+            elems_addrs.push(ElemAddr::from_raw_parts(&mut rdr)?);
+        }
+
+        Ok(elems_addrs)
+    }
+
+    pub fn read_block_data<R>(src: &mut R, block_header: &BlockHeader) -> Result<Vec<u8>>
+    where
+        R: Read + Seek,
+    {
         let mut result: Vec<u8> = vec![];
 
         let data_size = block_header.get_data_size();
@@ -361,10 +390,10 @@ impl V8File {
 
             read_in_bytes += bytes_to_read;
             if read_b < bytes_to_read as usize {
-                return Err(ioError::new(
+                return Err(Error::IoError(ioError::new(
                     ioErrorKind::Other,
                     "Прочитано слишком мало байт",
-                ));
+                )));
             }
 
             result.extend(lbuf.iter());
@@ -388,7 +417,7 @@ impl V8File {
     ) -> Result<bool> {
         let header = BlockHeader::from_raw_parts(src)?;
         if !header.is_correct() {
-            return Ok(false);
+            return Err(Error::NotV8File);
         }
 
         let block_data = V8File::read_block_data(src, &header)?;
@@ -397,13 +426,12 @@ impl V8File {
             Err(_) => block_data,
         };
 
-        let is_v8file = {
-            let mut rdr = Cursor::new(&out_data);
-            V8File::is_v8file(&mut rdr)
-        };
+        let mut rdr = Cursor::new(&out_data);
 
-        if is_v8file {
-            // TODO:
+        if V8File::is_v8file(&mut rdr) {
+            rdr.set_position(0);
+            let v8file = V8File::load_file(&mut rdr, _need_unpack)?;
+            v8file.save_file_to_folder(elem_path)?;
         } else {
             let mut elem_file = fs::File::create(elem_path.as_path())?;
             elem_file.write_all(&out_data)?;
@@ -427,6 +455,102 @@ impl V8File {
         };
 
         block_header.is_correct()
+    }
+
+    pub fn load_file<R>(reader: &mut R, boolInflate: bool) -> Result<Self>
+    where
+        R: Read + Seek,
+    {
+        let fh = FileHeader::from_raw_parts(reader)?;
+        let bh = BlockHeader::from_raw_parts(reader)?;
+
+        if !bh.is_correct() {
+            return Err(Error::NotV8File);
+        }
+
+        let elems_addrs = V8File::read_elems_addrs(reader, &bh)?;
+        let mut _elems: Vec<V8Elem> = vec![];
+
+        for cur_elem in elems_addrs.iter() {
+            if cur_elem.fffffff != V8_MAGIC_NUMBER {
+                break;
+            }
+
+            reader.seek(SeekFrom::Start(cur_elem.elem_header_addr as u64))?;
+
+            let elem_block_header = BlockHeader::from_raw_parts(reader)?;
+
+            if !elem_block_header.is_correct() {
+                return Err(Error::NotV8File);
+            }
+
+            let elem_block_header_data = V8File::read_block_data(reader, &elem_block_header)?;
+
+            let elem_block_data: Vec<u8> = if cur_elem.elem_data_addr != V8_MAGIC_NUMBER {
+                reader.seek(SeekFrom::Start(cur_elem.elem_data_addr as u64))?;
+                let block_header_data = BlockHeader::from_raw_parts(reader)?;
+
+                V8File::read_block_data(reader, &block_header_data)?
+            } else {
+                vec![]
+            };
+
+            let out_data = match inflate::inflate_bytes(&elem_block_data) {
+                Ok(inf_bytes) => inf_bytes,
+                Err(_) => elem_block_data,
+            };
+
+            let _data = out_data.clone();
+            let mut rdr = Cursor::new(&out_data);
+            let _is_v8file = V8File::is_v8file(&mut rdr);
+
+            let _unpacked_data = if _is_v8file {
+                rdr.set_position(0);
+                Some(V8File::load_file(&mut rdr, boolInflate)?)
+            } else {
+                None
+            };
+
+            let element = V8Elem {
+                header: elem_block_header_data,
+                data: Some(_data),
+                unpacked_data: _unpacked_data,
+                is_v8file: _is_v8file,
+            };
+
+            _elems.push(element);
+        }
+
+        Ok(V8File {
+            file_header: fh,
+            elems_addrs: elems_addrs,
+            elems: _elems,
+        })
+    }
+
+    pub fn save_file_to_folder(&self, elem_path: &path::PathBuf) -> Result<bool> {
+        if !elem_path.exists() {
+            fs::create_dir(elem_path.as_path())?;
+        }
+
+        for elem in self.elems.iter() {
+            let name_elem = elem.get_name();
+
+            let out_path = elem_path.join(name_elem);
+
+            if !elem.is_v8file {
+                if let Some(out_data) = elem.data.as_ref() {
+                    let mut filename_out = fs::File::create(out_path.as_path())?;
+                    filename_out.write_all(out_data)?;
+                }
+            } else {
+                if let Some(out_file) = elem.unpacked_data.as_ref() {
+                    out_file.save_file_to_folder(&out_path)?;
+                }
+            }
+        }
+
+        Ok(true)
     }
 }
 

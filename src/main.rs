@@ -9,10 +9,11 @@ mod container;
 
 use clap::{App, Arg};
 
-fn parse(args: Vec<&str>) -> std::io::Result<()> {
-    container::V8File::unpack_to_directory_no_load(&args[0], &args[1], true, true)?;
-
-    Ok(())
+fn parse(args: Vec<&str>) -> bool {
+    match container::V8File::unpack_to_directory_no_load(&args[0], &args[1], true, true) {
+        Ok(b) => b,
+        Err(e) => panic!(e.to_string()),
+    }
 }
 
 fn main() {
@@ -35,6 +36,8 @@ fn main() {
         .get_matches();
     if let Some(vals) = app_m.values_of("parse") {
         let v: Vec<&str> = vals.collect();
-        parse(v).unwrap();
+        if parse(v) {
+            std::process::exit(0);
+        }
     }
 }
