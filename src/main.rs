@@ -5,12 +5,14 @@ extern crate deflate;
 extern crate hex;
 extern crate inflate;
 
+mod error;
 mod container;
+mod parser;
 
 use clap::{App, Arg};
 
 fn parse(args: Vec<&str>) -> bool {
-    match container::V8File::unpack_to_directory_no_load(&args[0], &args[1], true, true) {
+    match parser::Parser::unpack_to_directory_no_load(&args[0], &args[1], true, true) {
         Ok(b) => b,
         Err(e) => panic!(e.to_string()),
     }
