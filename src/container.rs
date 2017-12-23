@@ -253,7 +253,7 @@ impl BlockHeader {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ElemAddr {
     pub elem_header_addr: u32,
     pub elem_data_addr: u32,
@@ -287,16 +287,6 @@ impl ElemAddr {
     }
 }
 
-impl Default for ElemAddr {
-    fn default() -> ElemAddr {
-        ElemAddr {
-            elem_header_addr: 0,
-            elem_data_addr: 0,
-            fffffff: 0,
-        }
-    }
-}
-
 #[allow(dead_code)]
 struct ElemHeaderBegin {
     date_creation: u64,
@@ -308,14 +298,48 @@ impl ElemHeaderBegin {
     pub const SIZE: u32 = 8 + 8 + 4;
 }
 
+#[derive(Debug)]
 pub struct V8Elem {
-    pub header: Vec<u8>,
-    pub data: Option<Vec<u8>>,
-    pub unpacked_data: Option<V8File>,
-    pub is_v8file: bool,
+    header: Vec<u8>,
+    data: Option<Vec<u8>>,
+    unpacked_data: Option<V8File>,
+    is_v8file: bool,
 }
 
 impl V8Elem {
+    pub fn new() -> V8Elem {
+        V8Elem {
+            header: vec![],
+            data: None,
+            unpacked_data: None,
+            is_v8file: false,
+        }
+    }
+
+    pub fn with_header(mut self, value: Vec<u8>) -> Self {
+        self.header = value;
+
+        self
+    }
+
+    pub fn with_data(mut self, value: Vec<u8>) -> Self {
+        self.data = Some(value);
+
+        self
+    }
+
+    pub fn with_unpacked_data(mut self, value: V8File) -> Self {
+        self.unpacked_data = Some(value);
+
+        self
+    }
+
+    pub fn is_v8file(mut self, value: bool) -> Self {
+        self.is_v8file = value;
+
+        self
+    }
+
     pub fn get_name(&self) -> Result<String> {
         let (_, raw_name) = self.header.split_at(ElemHeaderBegin::SIZE as usize);
         let mut v_raw_name: Vec<u8> = vec![];
@@ -332,6 +356,7 @@ impl V8Elem {
     }
 }
 
+#[derive(Debug)]
 pub struct V8File {
     file_header: FileHeader,
     elems_addrs: Vec<ElemAddr>,
@@ -347,20 +372,20 @@ impl V8File {
         }
     }
 
-    pub fn with_header(mut self, header: FileHeader) -> V8File {
-        self.file_header = header;
+    pub fn with_header(mut self, value: FileHeader) -> Self {
+        self.file_header = value;
 
         self
     }
 
-    pub fn with_elems_addrs(mut self, elems: Vec<ElemAddr>) -> V8File {
-        self.elems_addrs = elems;
+    pub fn with_elems_addrs(mut self, value: Vec<ElemAddr>) -> Self {
+        self.elems_addrs = value;
 
         self
     }
 
-    pub fn with_elems(mut self, elems: Vec<V8Elem>) -> V8File {
-        self.elems = elems;
+    pub fn with_elems(mut self, value: Vec<V8Elem>) -> Self {
+        self.elems = value;
 
         self
     }

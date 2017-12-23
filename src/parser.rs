@@ -46,13 +46,7 @@ impl Parser {
             }
 
             let elem_block_data = Parser::read_block_data(&mut buf_reader, &elem_block_header)?;
-            let elem = V8Elem {
-                header: elem_block_data,
-                data: None,
-                unpacked_data: None,
-                is_v8file: false,
-            };
-            let elem_name = elem.get_name()?;
+            let elem_name = V8Elem::new().with_header(elem_block_data).get_name()?;
 
             let elem_path = p_dir.join(&elem_name);
 
@@ -64,11 +58,11 @@ impl Parser {
         Ok(true)
     }
 
-    fn read_elems_addrs<R>(reader: &mut R, block_header: &BlockHeader) -> Result<Vec<ElemAddr>>
+    fn read_elems_addrs<R>(src: &mut R, block_header: &BlockHeader) -> Result<Vec<ElemAddr>>
     where
         R: Read + Seek,
     {
-        let block_data = Parser::read_block_data(reader, block_header)?;
+        let block_data = Parser::read_block_data(src, block_header)?;
         let data_size = block_data.len() as u64;
         let mut rdr = Cursor::new(block_data);
 
@@ -148,36 +142,36 @@ impl Parser {
         Ok(true)
     }
 
-    pub fn load_file<R>(reader: &mut R, bool_inflate: bool) -> Result<V8File>
+    pub fn load_file<R>(src: &mut R, bool_inflate: bool) -> Result<V8File>
     where
         R: Read + Seek + V8Container,
     {
-        let file_header = reader.get_file_header()?;
-        let first_block_header = reader.get_first_block_header()?;
+        let file_header = src.get_file_header()?;
+        let first_block_header = src.get_first_block_header()?;
 
-        let elems_addrs = Parser::read_elems_addrs(reader, &first_block_header)?;
-        let mut _elems: Vec<V8Elem> = vec![];
+        let elems_addrs = Parser::read_elems_addrs(src, &first_block_header)?;
+        let mut elems: Vec<V8Elem> = vec![];
 
         for cur_elem in elems_addrs.iter() {
             if cur_elem.fffffff != V8_MAGIC_NUMBER {
                 break;
             }
 
-            reader.seek(SeekFrom::Start(cur_elem.elem_header_addr as u64))?;
+            src.seek(SeekFrom::Start(cur_elem.elem_header_addr as u64))?;
 
-            let elem_block_header = BlockHeader::from_raw_parts(reader)?;
+            let elem_block_header = BlockHeader::from_raw_parts(src)?;
 
             if !elem_block_header.is_correct() {
                 return Err(error::V8Error::NotV8File);
             }
 
-            let elem_block_header_data = Parser::read_block_data(reader, &elem_block_header)?;
+            let elem_block_header_data = Parser::read_block_data(src, &elem_block_header)?;
 
             let elem_block_data: Vec<u8> = if cur_elem.elem_data_addr != V8_MAGIC_NUMBER {
-                reader.seek(SeekFrom::Start(cur_elem.elem_data_addr as u64))?;
-                let block_header_data = BlockHeader::from_raw_parts(reader)?;
+                src.seek(SeekFrom::Start(cur_elem.elem_data_addr as u64))?;
+                let block_header_data = BlockHeader::from_raw_parts(src)?;
 
-                Parser::read_block_data(reader, &block_header_data)?
+                Parser::read_block_data(src, &block_header_data)?
             } else {
                 vec![]
             };
@@ -188,29 +182,28 @@ impl Parser {
             };
 
             let mut rdr = Cursor::new(out_data);
-            let _is_v8file = rdr.is_v8file()?;
+            let is_v8file = rdr.is_v8file()?;
 
-            let _unpacked_data = if _is_v8file {
-                Some(Parser::load_file(&mut rdr, bool_inflate)?)
+            let unpacked_data = if is_v8file {
+                Parser::load_file(&mut rdr, bool_inflate)?
             } else {
-                None
+                V8File::new()
             };
 
             let out_data = rdr.into_inner();
 
-            let element = V8Elem {
-                header: elem_block_header_data,
-                data: Some(out_data),
-                unpacked_data: _unpacked_data,
-                is_v8file: _is_v8file,
-            };
-
-            _elems.push(element);
+            elems.push(
+                V8Elem::new()
+                    .with_header(elem_block_header_data)
+                    .with_data(out_data)
+                    .with_unpacked_data(unpacked_data)
+                    .is_v8file(is_v8file),
+            );
         }
 
         Ok(V8File::new()
             .with_header(file_header)
             .with_elems_addrs(elems_addrs)
-            .with_elems(_elems))
+            .with_elems(elems))
     }
 }
