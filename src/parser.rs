@@ -19,19 +19,18 @@ impl Parser {
         let file = fs::File::open(file_name)?;
         let mut buf_reader = BufReader::new(file);
 
-        let _fh = FileHeader::from_raw_parts(&mut buf_reader)?;
-        let bh = BlockHeader::from_raw_parts(&mut buf_reader)?;
-
-        if !bh.is_correct() {
+        if !buf_reader.is_v8file()? {
             return Ok(false);
         }
+
+        let first_block_header = buf_reader.get_first_block_header()?;
 
         let p_dir = path::Path::new(dir_name);
         if !p_dir.exists() {
             fs::create_dir(dir_name)?;
         }
 
-        let elems_addrs = Parser::read_elems_addrs(&mut buf_reader, &bh)?;
+        let elems_addrs = Parser::read_elems_addrs(&mut buf_reader, &first_block_header)?;
 
         for cur_elem in elems_addrs.iter() {
             if cur_elem.fffffff != V8_MAGIC_NUMBER {
@@ -140,47 +139,23 @@ impl Parser {
 
         let mut rdr = Cursor::new(&out_data);
 
-        if Parser::is_v8file(&mut rdr) {
-            rdr.set_position(0);
-            let v8file = Parser::load_file(&mut rdr, _need_unpack)?;
-            v8file.save_file_to_folder(elem_path)?;
+        if rdr.is_v8file()? {
+            Parser::load_file(&mut rdr, _need_unpack)?.save_file_to_folder(elem_path)?;
         } else {
-            let mut elem_file = fs::File::create(elem_path.as_path())?;
-            elem_file.write_all(&out_data)?;
+            fs::File::create(elem_path.as_path())?.write_all(&out_data)?;
         }
 
         Ok(true)
     }
 
-    pub fn is_v8file<R>(reader: &mut R) -> bool
-    where
-        R: Read + Seek,
-    {
-        let _file_header = match FileHeader::from_raw_parts(reader) {
-            Ok(header) => header,
-            Err(_) => return false,
-        };
-
-        let block_header = match BlockHeader::from_raw_parts(reader) {
-            Ok(header) => header,
-            Err(_) => return false,
-        };
-       
-        block_header.is_correct()
-    }
-
     pub fn load_file<R>(reader: &mut R, bool_inflate: bool) -> Result<V8File>
     where
-        R: Read + Seek,
+        R: Read + Seek + V8Container,
     {
-        let fh = FileHeader::from_raw_parts(reader)?;
-        let bh = BlockHeader::from_raw_parts(reader)?;
+        let file_header = reader.get_file_header()?;
+        let first_block_header = reader.get_first_block_header()?;
 
-        if !bh.is_correct() {
-            return Err(error::V8Error::NotV8File);
-        }
-
-        let elems_addrs = Parser::read_elems_addrs(reader, &bh)?;
+        let elems_addrs = Parser::read_elems_addrs(reader, &first_block_header)?;
         let mut _elems: Vec<V8Elem> = vec![];
 
         for cur_elem in elems_addrs.iter() {
@@ -213,10 +188,9 @@ impl Parser {
             };
 
             let mut rdr = Cursor::new(out_data);
-            let _is_v8file = Parser::is_v8file(&mut rdr);
+            let _is_v8file = rdr.is_v8file()?;
 
             let _unpacked_data = if _is_v8file {
-                rdr.set_position(0);
                 Some(Parser::load_file(&mut rdr, bool_inflate)?)
             } else {
                 None
@@ -235,7 +209,7 @@ impl Parser {
         }
 
         Ok(V8File::new()
-            .with_header(fh)
+            .with_header(file_header)
             .with_elems_addrs(elems_addrs)
             .with_elems(_elems))
     }

@@ -1,5 +1,5 @@
 use std::{fmt, fs, path, result, str, u32};
-use std::io::{Cursor, Error as ioError, ErrorKind as ioErrorKind, SeekFrom};
+use std::io::{BufReader, Cursor, Error as ioError, ErrorKind as ioErrorKind, SeekFrom};
 use std::io::prelude::*;
 
 use byteorder::{LittleEndian, ReadBytesExt};
@@ -11,8 +11,77 @@ pub type Result<T> = result::Result<T, error::V8Error>;
 
 pub const V8_MAGIC_NUMBER: u32 = 0x7fffffff;
 
-#[derive(Debug, Default)]
+pub trait V8Container {
+    fn is_v8file(&mut self) -> Result<bool>;
+    fn get_file_header(&mut self) -> Result<FileHeader>;
+    fn get_first_block_header(&mut self) -> Result<BlockHeader>;
+}
+
+impl<T> V8Container for Cursor<T>
+where
+    T: AsRef<[u8]>,
+{
+    fn is_v8file(&mut self) -> Result<bool> {
+        self.set_position(0);
+
+        let _file_header = match FileHeader::from_raw_parts(self) {
+            Ok(header) => header,
+            Err(_) => return Ok(false),
+        };
+
+        let block_header = match BlockHeader::from_raw_parts(self) {
+            Ok(header) => header,
+            Err(_) => return Ok(false),
+        };
+
+        Ok(block_header.is_correct())
+    }
+
+    fn get_file_header(&mut self) -> Result<FileHeader> {
+        self.set_position(0);
+
+        FileHeader::from_raw_parts(self)
+    }
+
+    fn get_first_block_header(&mut self) -> Result<BlockHeader> {
+        self.set_position(FileHeader::SIZE as u64);
+
+        BlockHeader::from_raw_parts(self)
+    }
+}
+
+impl V8Container for BufReader<fs::File> {
+    fn is_v8file(&mut self) -> Result<bool> {
+        self.seek(SeekFrom::Start(0))?;
+
+        let _file_header = match FileHeader::from_raw_parts(self) {
+            Ok(header) => header,
+            Err(_) => return Ok(false),
+        };
+
+        let block_header = match BlockHeader::from_raw_parts(self) {
+            Ok(header) => header,
+            Err(_) => return Ok(false),
+        };
+
+        Ok(block_header.is_correct())
+    }
+
+    fn get_file_header(&mut self) -> Result<FileHeader> {
+        self.seek(SeekFrom::Start(0))?;
+
+        FileHeader::from_raw_parts(self)
+    }
+
+    fn get_first_block_header(&mut self) -> Result<BlockHeader> {
+        self.seek(SeekFrom::Start(FileHeader::SIZE as u64))?;
+
+        BlockHeader::from_raw_parts(self)
+    }
+}
+
 #[repr(C)]
+#[derive(Debug, Default, Clone)]
 pub struct FileHeader {
     next_page_addr: u32,
     page_size: u32,
@@ -60,7 +129,7 @@ impl FileHeader {
     }
 }
 
-#[derive(Debug, Copy)]
+#[derive(Debug, Clone)]
 pub struct BlockHeader {
     eol_0d: u8,
     eol_0a: u8,
@@ -88,12 +157,6 @@ impl Default for BlockHeader {
             eol2_0d: b'\r',
             eol2_0a: b'\n',
         }
-    }
-}
-
-impl Clone for BlockHeader {
-    fn clone(&self) -> BlockHeader {
-        *self
     }
 }
 
