@@ -13,6 +13,13 @@ fn parse(args: Vec<&str>) -> bool {
     }
 }
 
+fn unpack(args: Vec<&str>) -> bool {
+    match parser::Parser::unpack_to_folder(&args[0], &args[1]) {
+        Ok(b) => b,
+        Err(e) => panic!(e.to_string()),
+    }
+}
+
 fn main() {
     let app_m = App::new("v8unpack")
         .version(crate_version!())
@@ -30,10 +37,25 @@ fn main() {
                 .takes_value(true)
                 .value_names(&["INPUTFILE", "OUTDIR"]),
         )
+        .arg(
+            Arg::with_name("unpack")
+                .short("u")
+                .long("unpack")
+                .help("распаковать двоичные файлы в каталог")
+                .takes_value(true)
+                .value_names(&["INPUTFILE", "OUTDIR"]),
+        )
         .get_matches();
     if let Some(vals) = app_m.values_of("parse") {
         let v: Vec<&str> = vals.collect();
         if parse(v) {
+            std::process::exit(0);
+        }
+    }
+
+    if let Some(vals) = app_m.values_of("unpack") {
+        let v: Vec<&str> = vals.collect();
+        if unpack(v) {
             std::process::exit(0);
         }
     }

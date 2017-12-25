@@ -2,7 +2,7 @@ use std::{fmt, fs, path, result, str, u32};
 use std::io::{BufReader, Cursor, Error as ioError, ErrorKind as ioErrorKind, SeekFrom};
 use std::io::prelude::*;
 
-use byteorder::{LittleEndian, ReadBytesExt};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::convert::AsMut;
 
 use error;
@@ -126,6 +126,17 @@ impl FileHeader {
             storage_ver: _storage_ver,
             reserved: _reserved,
         })
+    }
+
+    pub fn into_bytes(self) -> Result<Vec<u8>> {
+        let mut result = Vec::new();
+
+        result.write_u32::<LittleEndian>(self.next_page_addr)?;
+        result.write_u32::<LittleEndian>(self.page_size)?;
+        result.write_u32::<LittleEndian>(self.storage_ver)?;
+        result.write_u32::<LittleEndian>(self.reserved)?;
+
+        Ok(result)
     }
 }
 
@@ -251,6 +262,23 @@ impl BlockHeader {
 
         u32::from_str_radix(s, 16).unwrap_or_default()
     }
+
+    pub fn into_bytes(self) -> Result<Vec<u8>> {
+        let mut result = Vec::new();
+
+        result.push(self.eol_0d);
+        result.push(self.eol_0a);
+        result.extend(self.data_size_hex.iter());
+        result.push(self.space1);
+        result.extend(self.page_size_hex.iter());
+        result.push(self.space2);
+        result.extend(self.next_page_addr_hex.iter());
+        result.push(self.space3);
+        result.push(self.eol2_0d);
+        result.push(self.eol2_0a);
+
+        Ok(result)
+    }
 }
 
 #[derive(Debug, Default)]
@@ -320,6 +348,10 @@ impl V8Elem {
         self.header = value;
 
         self
+    }
+
+    pub fn get_header(&self) -> &Vec<u8> {
+        &self.header
     }
 
     pub fn with_data(mut self, value: Vec<u8>) -> Self {

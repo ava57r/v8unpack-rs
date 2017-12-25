@@ -58,6 +58,63 @@ impl Parser {
         Ok(true)
     }
 
+    pub fn unpack_to_folder(file_name: &str, dir_name: &str) -> Result<bool> {
+        let file = fs::File::open(file_name)?;
+        let mut buf_reader = BufReader::new(file);
+
+        if !buf_reader.is_v8file()? {
+            return Ok(false);
+        }
+
+        let p_dir = path::Path::new(dir_name);
+        if !p_dir.exists() {
+            fs::create_dir(dir_name)?;
+        }
+
+        let file_header = buf_reader.get_file_header()?.into_bytes()?;
+        fs::File::create(p_dir.join("FileHeader"))?.write_all(&file_header)?;
+
+        let first_block_header = buf_reader.get_first_block_header()?;
+
+        let elems_addrs = Parser::read_elems_addrs(&mut buf_reader, &first_block_header)?;
+
+        for cur_elem in elems_addrs.iter() {
+            if cur_elem.fffffff != V8_MAGIC_NUMBER {
+                break;
+            }
+
+            buf_reader.seek(SeekFrom::Start(cur_elem.elem_header_addr as u64))?;
+
+            let elem_block_header = BlockHeader::from_raw_parts(&mut buf_reader)?;
+
+            if !elem_block_header.is_correct() {
+                return Err(error::V8Error::NotV8File);
+            }
+
+            let elem_block_data = Parser::read_block_data(&mut buf_reader, &elem_block_header)?;
+            let v8_elem = V8Elem::new().with_header(elem_block_data);
+            let elem_name = v8_elem.get_name()?;
+            
+            let mut file_elem_header = String::new();
+            file_elem_header.push_str(&elem_name);
+            file_elem_header.push_str(".header");
+
+            fs::File::create(p_dir.join(&file_elem_header))?.write_all(&v8_elem.get_header())?;
+            
+            if cur_elem.elem_data_addr != V8_MAGIC_NUMBER {
+                buf_reader.seek(SeekFrom::Start(cur_elem.elem_data_addr as u64))?;
+                let block_header_data = BlockHeader::from_raw_parts(&mut buf_reader)?;
+
+                let block_data = Parser::read_block_data(&mut buf_reader, &block_header_data)?;
+                let mut file_elem_data = String::new();
+                file_elem_data.push_str(&elem_name);
+                file_elem_data.push_str(".data");
+                fs::File::create(p_dir.join(&file_elem_data))?.write_all(&block_data)?;
+            }
+        }
+        Ok(true)
+    }
+
     fn read_elems_addrs<R>(src: &mut R, block_header: &BlockHeader) -> Result<Vec<ElemAddr>>
     where
         R: Read + Seek,
