@@ -1,15 +1,10 @@
-extern crate byteorder;
 #[macro_use]
 extern crate clap;
-extern crate deflate;
-extern crate hex;
-extern crate inflate;
-
-mod error;
-mod container;
-mod parser;
+extern crate v8unpack4rs;
 
 use clap::{App, Arg};
+
+use v8unpack4rs::parser;
 
 fn parse(args: Vec<&str>) -> bool {
     match parser::Parser::unpack_to_directory_no_load(&args[0], &args[1], true, true) {
@@ -19,7 +14,7 @@ fn parse(args: Vec<&str>) -> bool {
 }
 
 fn main() {
-    let app_m = App::new("v8unpack-rs")
+    let app_m = App::new("v8unpack")
         .version(crate_version!())
         .author(crate_authors!())
         .setting(clap::AppSettings::ArgRequiredElseHelp)

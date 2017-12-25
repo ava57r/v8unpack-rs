@@ -1,0 +1,12 @@
+[package]
+name = "v8unpack4rs"
+description = "Unpack, pack, deflate and inflate 1C v8 file (*.cf)"
+authors = ["Andreev Alexander <andreevlex.as@gmail.com>"]
+version = "0.1.0"
+readme = "README.md"
+
+[dependencies]
+deflate = "0.7.17"
+inflate = "0.3.3"
+byteorder = "1.2.1"
+hex = "0.3.1"
