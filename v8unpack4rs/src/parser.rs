@@ -94,13 +94,13 @@ impl Parser {
             let elem_block_data = Parser::read_block_data(&mut buf_reader, &elem_block_header)?;
             let v8_elem = V8Elem::new().with_header(elem_block_data);
             let elem_name = v8_elem.get_name()?;
-            
+
             let mut file_elem_header = String::new();
             file_elem_header.push_str(&elem_name);
             file_elem_header.push_str(".header");
 
             fs::File::create(p_dir.join(&file_elem_header))?.write_all(&v8_elem.get_header())?;
-            
+
             if cur_elem.elem_data_addr != V8_MAGIC_NUMBER {
                 buf_reader.seek(SeekFrom::Start(cur_elem.elem_data_addr as u64))?;
                 let block_header_data = BlockHeader::from_raw_parts(&mut buf_reader)?;
