@@ -19,7 +19,7 @@ impl Parser {
         let file = fs::File::open(file_name)?;
         let mut buf_reader = BufReader::new(file);
 
-        if !buf_reader.is_v8file()? {
+        if !buf_reader.is_v8file() {
             return Ok(false);
         }
 
@@ -62,7 +62,7 @@ impl Parser {
         let file = fs::File::open(file_name)?;
         let mut buf_reader = BufReader::new(file);
 
-        if !buf_reader.is_v8file()? {
+        if !buf_reader.is_v8file() {
             return Ok(false);
         }
 
@@ -138,13 +138,13 @@ impl Parser {
     {
         let mut result: Vec<u8> = vec![];
 
-        let data_size = block_header.get_data_size();
+        let data_size = block_header.get_data_size()?;
         let mut read_in_bytes = 0;
 
         let mut local_block_header = block_header.clone();
         while read_in_bytes < data_size {
-            let page_size = local_block_header.get_page_size();
-            let next_page_addr = local_block_header.get_next_page_addr();
+            let page_size = local_block_header.get_page_size()?;
+            let next_page_addr = local_block_header.get_next_page_addr()?;
 
             let bytes_to_read = cmp::min(page_size, data_size - read_in_bytes);
             let mut lbuf: Vec<u8> = vec![];
@@ -153,8 +153,8 @@ impl Parser {
             read_in_bytes += bytes_to_read;
             if read_b < bytes_to_read as usize {
                 return Err(error::V8Error::IoError(ioError::new(
-                    ioErrorKind::Other,
-                    "Прочитано слишком мало байт",
+                    ioErrorKind::InvalidData,
+                    "Readed too few bytes",
                 )));
             }
 
@@ -190,7 +190,7 @@ impl Parser {
 
         let mut rdr = Cursor::new(&out_data);
 
-        if rdr.is_v8file()? {
+        if rdr.is_v8file() {
             Parser::load_file(&mut rdr, _need_unpack)?.save_file_to_folder(elem_path)?;
         } else {
             fs::File::create(elem_path.as_path())?.write_all(&out_data)?;
@@ -239,7 +239,7 @@ impl Parser {
             };
 
             let mut rdr = Cursor::new(out_data);
-            let is_v8file = rdr.is_v8file()?;
+            let is_v8file = rdr.is_v8file();
 
             let unpacked_data = if is_v8file {
                 Parser::load_file(&mut rdr, bool_inflate)?

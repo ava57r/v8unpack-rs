@@ -1,5 +1,4 @@
-use std::error::Error;
-use std::ffi::{CStr, IntoStringError, NulError};
+use std::ffi::CStr;
 use std::os::raw::c_char;
 use std::str::Utf8Error;
 use std::panic::catch_unwind;

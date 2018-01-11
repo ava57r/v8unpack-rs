@@ -4,6 +4,8 @@ description = "Unpack, pack, deflate and inflate 1C v8 file (*.cf)"
 authors = ["Andreev Alexander <andreevlex.as@gmail.com>"]
 version = "0.1.0"
 readme = "README.md"
+homepage = "https://github.com/andreevlex/v8unpack-rs"
+repository = "https://github.com/andreevlex/v8unpack-rs"
 
 [dependencies]
 deflate = "0.7.17"

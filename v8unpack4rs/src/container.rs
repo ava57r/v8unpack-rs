@@ -12,7 +12,7 @@ pub type Result<T> = result::Result<T, error::V8Error>;
 pub const V8_MAGIC_NUMBER: u32 = 0x7fffffff;
 
 pub trait V8Container {
-    fn is_v8file(&mut self) -> Result<bool>;
+    fn is_v8file(&mut self) -> bool;
     fn get_file_header(&mut self) -> Result<FileHeader>;
     fn get_first_block_header(&mut self) -> Result<BlockHeader>;
 }
@@ -21,20 +21,20 @@ impl<T> V8Container for Cursor<T>
 where
     T: AsRef<[u8]>,
 {
-    fn is_v8file(&mut self) -> Result<bool> {
+    fn is_v8file(&mut self) -> bool {
         self.set_position(0);
 
         let _file_header = match FileHeader::from_raw_parts(self) {
             Ok(header) => header,
-            Err(_) => return Ok(false),
+            Err(_) => return false,
         };
 
         let block_header = match BlockHeader::from_raw_parts(self) {
             Ok(header) => header,
-            Err(_) => return Ok(false),
+            Err(_) => return false,
         };
 
-        Ok(block_header.is_correct())
+        block_header.is_correct()
     }
 
     fn get_file_header(&mut self) -> Result<FileHeader> {
@@ -51,20 +51,22 @@ where
 }
 
 impl V8Container for BufReader<fs::File> {
-    fn is_v8file(&mut self) -> Result<bool> {
-        self.seek(SeekFrom::Start(0))?;
+    fn is_v8file(&mut self) -> bool {
+        if self.seek(SeekFrom::Start(0)).is_err() {
+            return false;
+        }
 
         let _file_header = match FileHeader::from_raw_parts(self) {
             Ok(header) => header,
-            Err(_) => return Ok(false),
+            Err(_) => return false,
         };
 
         let block_header = match BlockHeader::from_raw_parts(self) {
             Ok(header) => header,
-            Err(_) => return Ok(false),
+            Err(_) => return false,
         };
 
-        Ok(block_header.is_correct())
+        block_header.is_correct()
     }
 
     fn get_file_header(&mut self) -> Result<FileHeader> {
@@ -110,7 +112,7 @@ impl FileHeader {
         if read_bytes < Self::SIZE as usize {
             return Err(error::V8Error::IoError(ioError::new(
                 ioErrorKind::InvalidData,
-                "Слишком мало байт прочитано",
+                "Readed too few bytes",
             )));
         }
 
@@ -197,7 +199,7 @@ impl BlockHeader {
         if read_bytes < Self::SIZE as usize {
             return Err(error::V8Error::IoError(ioError::new(
                 ioErrorKind::InvalidData,
-                "Слишком мало байт прочитано",
+                "Readed too few bytes",
             )));
         }
 
@@ -242,25 +244,22 @@ impl BlockHeader {
             && self.eol2_0a == b'\n'
     }
 
-    pub fn get_data_size(&self) -> u32 {
+    pub fn get_data_size(&self) -> Result<u32> {
         Self::get_u32(&self.data_size_hex)
     }
 
-    pub fn get_page_size(&self) -> u32 {
+    pub fn get_page_size(&self) -> Result<u32> {
         Self::get_u32(&self.page_size_hex)
     }
 
-    pub fn get_next_page_addr(&self) -> u32 {
+    pub fn get_next_page_addr(&self) -> Result<u32> {
         Self::get_u32(&self.next_page_addr_hex)
     }
 
-    fn get_u32(value: &[u8]) -> u32 {
-        let s = match str::from_utf8(value) {
-            Ok(v) => v,
-            Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
-        };
+    fn get_u32(value: &[u8]) -> Result<u32> {
+        let s = str::from_utf8(&value)?;
 
-        u32::from_str_radix(s, 16).unwrap_or_default()
+        Ok(u32::from_str_radix(s, 16)?)
     }
 
     pub fn into_bytes(self) -> Result<Vec<u8>> {
