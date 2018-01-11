@@ -11,9 +11,16 @@ pub type Result<T> = result::Result<T, error::V8Error>;
 
 pub const V8_MAGIC_NUMBER: u32 = 0x7fffffff;
 
+/// Trait for to get basic information about the container
 pub trait V8Container {
+
+    /// This method checks that the container is actually the correct file of 1C: Enterprise
     fn is_v8file(&mut self) -> bool;
+
+    /// Returns root file header from container
     fn get_file_header(&mut self) -> Result<FileHeader>;
+
+    /// Returns first block from container
     fn get_first_block_header(&mut self) -> Result<BlockHeader>;
 }
 
@@ -92,6 +99,7 @@ pub struct FileHeader {
 }
 
 impl FileHeader {
+    /// The size of the data in the file, represented as C structures
     pub const SIZE: u32 = 4 + 4 + 4 + 4;
 
     pub fn new(next_page_addr: u32, page_size: u32, storage_ver: u32) -> FileHeader {
@@ -188,6 +196,7 @@ impl fmt::Display for BlockHeader {
 }
 
 impl BlockHeader {
+    /// The size of the data in the file, represented as C structures
     pub const SIZE: u32 = 1 + 1 + 8 + 1 + 8 + 1 + 8 + 1 + 1 + 1;
 
     pub fn from_raw_parts<R>(src: &mut R) -> Result<BlockHeader>
@@ -288,6 +297,7 @@ pub struct ElemAddr {
 }
 
 impl ElemAddr {
+    /// The size of the data in the file, represented as C structures
     pub const SIZE: u32 = 4 + 4 + 4;
 
     pub fn new(elem_data_addr: u32, elem_header_addr: u32) -> Self {
