@@ -136,9 +136,10 @@ impl Parser {
     where
         R: Read + Seek,
     {
-        let mut result: Vec<u8> = vec![];
-
         let data_size = block_header.get_data_size()?;
+        
+        let mut result: Vec<u8> = Vec::with_capacity(data_size as usize);
+
         let mut read_in_bytes = 0;
 
         let mut local_block_header = block_header.clone();
@@ -147,20 +148,19 @@ impl Parser {
             let next_page_addr = local_block_header.get_next_page_addr()?;
 
             let bytes_to_read = cmp::min(page_size, data_size - read_in_bytes);
-            let mut lbuf: Vec<u8> = vec![];
+            let mut lbuf: Vec<u8> = Vec::with_capacity(bytes_to_read as usize);
             let read_b = src.take(bytes_to_read as u64).read_to_end(&mut lbuf)?;
 
             read_in_bytes += bytes_to_read;
             if read_b < bytes_to_read as usize {
                 return Err(error::V8Error::IoError(ioError::new(
                     ioErrorKind::InvalidData,
-                    "Readed too few bytes",
+                    "Readied too few bytes",
                 )));
             }
 
             result.extend(lbuf.iter());
-            lbuf.clear();
-
+            
             if next_page_addr != V8_MAGIC_NUMBER {
                 src.seek(SeekFrom::Start(next_page_addr as u64))?;
                 local_block_header = BlockHeader::from_raw_parts(src)?;

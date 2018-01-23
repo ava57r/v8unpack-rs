@@ -120,7 +120,7 @@ impl FileHeader {
         if read_bytes < Self::SIZE as usize {
             return Err(error::V8Error::IoError(ioError::new(
                 ioErrorKind::InvalidData,
-                "Readed too few bytes",
+                "Readied too few bytes",
             )));
         }
 
@@ -208,7 +208,7 @@ impl BlockHeader {
         if read_bytes < Self::SIZE as usize {
             return Err(error::V8Error::IoError(ioError::new(
                 ioErrorKind::InvalidData,
-                "Readed too few bytes",
+                "Readied too few bytes",
             )));
         }
 
