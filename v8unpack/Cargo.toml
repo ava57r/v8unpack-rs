@@ -1,5 +1,6 @@
 [package]
 name = "v8unpack"
+description = "Unpack, pack, deflate and inflate 1C v8 file (*.cf)"
 version = "0.1.0"
 authors = ["Andreev Alexander <andreevlex.as@gmail.com>"]
 homepage = "https://github.com/andreevlex/v8unpack-rs"
