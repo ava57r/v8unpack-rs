@@ -33,7 +33,7 @@ fn main() {
             Arg::with_name("parse")
                 .short("p")
                 .long("parse")
-                .help("распаковать файлы в каталог")
+                .help("unzip the files into a directory")
                 .takes_value(true)
                 .value_names(&["INPUTFILE", "OUTDIR"]),
         )
@@ -41,7 +41,7 @@ fn main() {
             Arg::with_name("unpack")
                 .short("u")
                 .long("unpack")
-                .help("распаковать двоичные файлы в каталог")
+                .help("unzip the binaries into the directory")
                 .takes_value(true)
                 .value_names(&["INPUTFILE", "OUTDIR"]),
         )
