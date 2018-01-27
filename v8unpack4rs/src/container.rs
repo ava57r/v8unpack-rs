@@ -9,18 +9,18 @@ use error;
 
 pub type Result<T> = result::Result<T, error::V8Error>;
 
+/// Indicates that no further data.
 pub const V8_MAGIC_NUMBER: u32 = 0x7fffffff;
 
-/// Trait for to get basic information about the container
+/// Trait for to get basic information about the container.
 pub trait V8Container {
-
-    /// This method checks that the container is actually the correct file of 1C: Enterprise
+    /// This method checks that the container is actually the correct file of 1C: Enterprise.
     fn is_v8file(&mut self) -> bool;
 
-    /// Returns root file header from container
+    /// Returns root file header from container.
     fn get_file_header(&mut self) -> Result<FileHeader>;
 
-    /// Returns first block from container
+    /// Returns first block from container.
     fn get_first_block_header(&mut self) -> Result<BlockHeader>;
 }
 
@@ -89,6 +89,7 @@ impl V8Container for BufReader<fs::File> {
     }
 }
 
+/// Describes the structure of the header of the container file.
 #[repr(C)]
 #[derive(Debug, Default, Clone)]
 pub struct FileHeader {
@@ -150,6 +151,8 @@ impl FileHeader {
     }
 }
 
+/// Describes the structure of header data block.
+/// Example empty block header `\r\n00000000 00000000 00000000 \r\n`.
 #[derive(Debug, Clone)]
 pub struct BlockHeader {
     eol_0d: u8,
@@ -196,9 +199,10 @@ impl fmt::Display for BlockHeader {
 }
 
 impl BlockHeader {
-    /// The size of the data in the file, represented as C structures
+    /// The size of the data in the file, represented as C structures.
     pub const SIZE: u32 = 1 + 1 + 8 + 1 + 8 + 1 + 8 + 1 + 1 + 1;
 
+    /// Creates an instance of `BlockHeader` from a stream of bytes.
     pub fn from_raw_parts<R>(src: &mut R) -> Result<BlockHeader>
     where
         R: Read + Seek,
@@ -247,20 +251,24 @@ impl BlockHeader {
         })
     }
 
+    /// Checks that the block header for correctness.
     pub fn is_correct(&self) -> bool {
         self.eol_0d == b'\r' && self.eol_0a == b'\n' && self.space1 == b'\x20'
             && self.space2 == b'\x20' && self.space3 == b'\x20' && self.eol2_0d == b'\r'
             && self.eol2_0a == b'\n'
     }
 
+    /// Gets the value of the size of the data section from hexadecimal representation.
     pub fn get_data_size(&self) -> Result<u32> {
         Self::get_u32(&self.data_size_hex)
     }
 
+    /// Gets the value of the page size data from hexadecimal representation.
     pub fn get_page_size(&self) -> Result<u32> {
         Self::get_u32(&self.page_size_hex)
     }
 
+    /// Gets the offset of the next page of data from hexadecimal representation.
     pub fn get_next_page_addr(&self) -> Result<u32> {
         Self::get_u32(&self.next_page_addr_hex)
     }
@@ -271,6 +279,7 @@ impl BlockHeader {
         Ok(u32::from_str_radix(s, 16)?)
     }
 
+    /// Converts `BlockHeader` an array of bytes
     pub fn into_bytes(self) -> Result<Vec<u8>> {
         let mut result = Vec::new();
 
@@ -289,17 +298,22 @@ impl BlockHeader {
     }
 }
 
+/// Is the structure and arrangement of data partitions in the container.
 #[derive(Debug, Default)]
 pub struct ElemAddr {
+    /// The offset into the file where is the header block.
     pub elem_header_addr: u32,
+    /// The offset into the file where located data block.
     pub elem_data_addr: u32,
-    pub fffffff: u32, //всегда 0x7fffffff ?
+    /// Always equal `V8_MAGIC_NUMBER`.
+    pub fffffff: u32, //always == 0x7fffffff ?
 }
 
 impl ElemAddr {
-    /// The size of the data in the file, represented as C structures
+    /// The size of the data in the file, represented as C structures.
     pub const SIZE: u32 = 4 + 4 + 4;
 
+    /// Creates a new instance of `ElemAddr`.
     pub fn new(elem_data_addr: u32, elem_header_addr: u32) -> Self {
         ElemAddr {
             elem_header_addr: elem_header_addr,
@@ -308,6 +322,7 @@ impl ElemAddr {
         }
     }
 
+    /// Creates an instance of `ElemAddr` from a stream of bytes.
     pub fn from_raw_parts<R>(rdr: &mut R) -> Result<Self>
     where
         R: Read + Seek,
@@ -325,16 +340,18 @@ impl ElemAddr {
 }
 
 #[allow(dead_code)]
-struct ElemHeaderBegin {
+pub struct ElemHeaderBegin {
     date_creation: u64,
     date_modification: u64,
     res: u32,
 }
 
 impl ElemHeaderBegin {
+    /// The size of the data in the file, represented as C structures.
     pub const SIZE: u32 = 8 + 8 + 4;
 }
 
+/// Describes the structure of the data item container.
 #[derive(Debug)]
 pub struct V8Elem {
     header: Vec<u8>,
@@ -344,6 +361,7 @@ pub struct V8Elem {
 }
 
 impl V8Elem {
+    /// Creates a new instance of `V8Elem`.
     pub fn new() -> V8Elem {
         V8Elem {
             header: vec![],
@@ -375,12 +393,14 @@ impl V8Elem {
         self
     }
 
+    ///
     pub fn is_v8file(mut self, value: bool) -> Self {
         self.is_v8file = value;
 
         self
     }
 
+    /// Gets the name of the file in the container.
     pub fn get_name(&self) -> Result<String> {
         let (_, raw_name) = self.header.split_at(ElemHeaderBegin::SIZE as usize);
         let mut v_raw_name: Vec<u8> = vec![];
@@ -397,14 +417,19 @@ impl V8Elem {
     }
 }
 
+/// Describes the structure of the file `1cd`.
 #[derive(Debug)]
 pub struct V8File {
+    /// The file header `1cd`.
     file_header: FileHeader,
+    ///a collection of elements that describe offsets of the header and data sections.
     elems_addrs: Vec<ElemAddr>,
+    ///
     elems: Vec<V8Elem>,
 }
 
 impl V8File {
+    /// Creates a new instance of `V8File`.
     pub fn new() -> V8File {
         V8File {
             file_header: FileHeader::default(),
@@ -431,6 +456,7 @@ impl V8File {
         self
     }
 
+    /// Stores data in files on disk.
     pub fn save_file_to_folder(&self, elem_path: &path::PathBuf) -> Result<bool> {
         if !elem_path.exists() {
             fs::create_dir(elem_path.as_path())?;

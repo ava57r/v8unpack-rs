@@ -7,9 +7,11 @@ use std::io::prelude::*;
 
 use inflate;
 
+/// Contains methods for working with file format 1C: Enterprise 8 `1cd`.
 pub struct Parser;
 
 impl Parser {
+    /// Makes the unpacking of the container to a directory on disk.
     pub fn unpack_to_directory_no_load(
         file_name: &str,
         dir_name: &str,
@@ -58,6 +60,8 @@ impl Parser {
         Ok(true)
     }
 
+    /// Parses the container into its component parts so that the elements
+    /// are saved in binary format in a directory on disk.
     pub fn unpack_to_folder(file_name: &str, dir_name: &str) -> Result<bool> {
         let file = fs::File::open(file_name)?;
         let mut buf_reader = BufReader::new(file);
@@ -137,7 +141,7 @@ impl Parser {
         R: Read + Seek,
     {
         let data_size = block_header.get_data_size()?;
-        
+
         let mut result: Vec<u8> = Vec::with_capacity(data_size as usize);
 
         let mut read_in_bytes = 0;
@@ -160,7 +164,7 @@ impl Parser {
             }
 
             result.extend(lbuf.iter());
-            
+
             if next_page_addr != V8_MAGIC_NUMBER {
                 src.seek(SeekFrom::Start(next_page_addr as u64))?;
                 local_block_header = BlockHeader::from_raw_parts(src)?;
