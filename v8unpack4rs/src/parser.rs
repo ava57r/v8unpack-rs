@@ -62,6 +62,51 @@ impl Parser {
         Ok(true)
     }
 
+    fn start_file_parse(
+        rawdata: Receiver<RawData>,
+        p_dir: &path::Path,
+        bool_inflate: bool,
+    ) -> Result<bool> {
+        for item in rawdata {
+            let (block_data, elem_block_data) = (item.block_data, item.elem_block_data);
+            let out_data = match inflate::inflate_bytes(&block_data) {
+                Ok(inf_bytes) => inf_bytes,
+                Err(_) => block_data,
+            };
+
+            let elem_name = V8Elem::new().with_header(elem_block_data).get_name()?;
+            let elem_path = p_dir.join(&elem_name);
+
+            let mut rdr = Cursor::new(&out_data);
+            if rdr.is_v8file() {
+                Parser::load_file(&mut rdr, bool_inflate)?.save_file_to_folder(&elem_path)?;
+            } else {
+                fs::File::create(elem_path.as_path())?.write_all(&out_data)?;
+            }
+        }
+
+        Ok(true)
+    }
+
+    pub fn parse_to_folder(file_name: &str, dir_name: &str, bool_inflate: bool) -> Result<bool> {
+        let p_dir = path::Path::new(dir_name);
+        if !p_dir.exists() {
+            fs::create_dir(dir_name)?;
+        };
+
+        let (_, elems_addrs) = Parser::read_content(file_name)?;
+        let (rawdata, h1) =
+            Parser::start_file_reader_thread(path::PathBuf::from(file_name), elems_addrs);
+
+        let result = Parser::start_file_parse(rawdata, p_dir, bool_inflate);
+
+        let r1 = h1.join().unwrap();
+
+        r1?;
+
+        result
+    }
+
     /// Parses the container into its component parts so that the elements
     /// are saved in binary format in a directory on disk.
     pub fn unpack_to_folder(file_name: &str, dir_name: &str) -> Result<bool> {
@@ -195,22 +240,8 @@ impl Parser {
             fs::create_dir(dir_name)?;
         };
 
-        let elems_addrs = {
-            let file = fs::File::open(file_name)?;
-            let mut buf_reader = BufReader::new(file);
-
-            if !buf_reader.is_v8file() {
-                return Ok(false);
-            }
-
-            let file_header = buf_reader.get_file_header()?.into_bytes()?;
-            fs::File::create(p_dir.join("FileHeader"))?.write_all(&file_header)?;
-
-            let first_block_header = buf_reader.get_first_block_header()?;
-            let elems_addrs = Parser::read_elems_addrs(&mut buf_reader, &first_block_header)?;
-
-            elems_addrs
-        };
+        let (file_header, elems_addrs) = Parser::read_content(file_name)?;
+        fs::File::create(p_dir.join("FileHeader"))?.write_all(&file_header.into_bytes()?)?;
 
         let (rawdata, h1) =
             Parser::start_file_reader_thread(path::PathBuf::from(file_name), elems_addrs);
@@ -222,6 +253,21 @@ impl Parser {
         r1?;
 
         result
+    }
+
+    fn read_content(file_name: &str) -> Result<(FileHeader, Vec<ElemAddr>)> {
+        let file = fs::File::open(file_name)?;
+        let mut buf_reader = BufReader::new(file);
+
+        if !buf_reader.is_v8file() {
+            return Err(error::V8Error::NotV8File);
+        }
+
+        let file_header = buf_reader.get_file_header()?;
+        let first_block_header = buf_reader.get_first_block_header()?;
+        let elems_addrs = Parser::read_elems_addrs(&mut buf_reader, &first_block_header)?;
+
+        Ok((file_header, elems_addrs))
     }
 
     fn read_elems_addrs<R>(src: &mut R, block_header: &BlockHeader) -> Result<Vec<ElemAddr>>

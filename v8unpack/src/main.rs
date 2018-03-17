@@ -13,6 +13,13 @@ fn parse(args: Vec<&str>) -> bool {
     }
 }
 
+fn parse2(args: Vec<&str>) -> bool {
+    match parser::Parser::parse_to_folder(&args[0], &args[1], true) {
+        Ok(b) => b,
+        Err(e) => panic!(e.to_string()),
+    }
+}
+
 fn unpack(args: Vec<&str>) -> bool {
     match parser::Parser::unpack_to_folder(&args[0], &args[1]) {
         Ok(b) => b,
@@ -40,6 +47,14 @@ fn main() {
             Arg::with_name("parse")
                 .short("p")
                 .long("parse")
+                .help("unzip the files into a directory")
+                .takes_value(true)
+                .value_names(&["INPUTFILE", "OUTDIR"]),
+        )
+        .arg(
+            Arg::with_name("parse2")
+                .short("n")
+                .long("parse2")
                 .help("unzip the files into a directory")
                 .takes_value(true)
                 .value_names(&["INPUTFILE", "OUTDIR"]),
@@ -78,6 +93,13 @@ fn main() {
     if let Some(vals) = app_m.values_of("pipe") {
         let v: Vec<&str> = vals.collect();
         if unpack_pipeline(v) {
+            std::process::exit(0);
+        }
+    }
+
+    if let Some(vals) = app_m.values_of("parse2") {
+        let v: Vec<&str> = vals.collect();
+        if parse2(v) {
             std::process::exit(0);
         }
     }
