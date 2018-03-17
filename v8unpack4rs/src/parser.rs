@@ -62,29 +62,46 @@ impl Parser {
         Ok(true)
     }
 
-    fn start_file_parse(
+    fn start_inflate_thread(
         rawdata: Receiver<RawData>,
+    ) -> (Receiver<(Vec<u8>, V8Elem)>, JoinHandle<Result<()>>) {
+        let (sender, receiver) = channel();
+
+        let handle = spawn(move || {
+            for item in rawdata {
+                let (block_data, elem_block_data) = (item.block_data, item.elem_block_data);
+                let out_data = match inflate::inflate_bytes(&block_data) {
+                    Ok(inf_bytes) => inf_bytes,
+                    Err(_) => block_data,
+                };
+
+                let elem = V8Elem::new().with_header(elem_block_data);
+
+                if sender.send((out_data, elem)).is_err() {
+                    break;
+                }
+            }
+            Ok(())
+        });
+
+        (receiver, handle)
+    }
+
+    fn start_file_parse(
+        data: Receiver<(Vec<u8>, V8Elem)>,
         p_dir: &path::Path,
         bool_inflate: bool,
     ) -> Result<bool> {
-        for item in rawdata {
-            let (block_data, elem_block_data) = (item.block_data, item.elem_block_data);
-            let out_data = match inflate::inflate_bytes(&block_data) {
-                Ok(inf_bytes) => inf_bytes,
-                Err(_) => block_data,
-            };
+        for item in data {
+            let elem_path = p_dir.join(&item.1.get_name()?);
 
-            let elem_name = V8Elem::new().with_header(elem_block_data).get_name()?;
-            let elem_path = p_dir.join(&elem_name);
-
-            let mut rdr = Cursor::new(&out_data);
+            let mut rdr = Cursor::new(&item.0);
             if rdr.is_v8file() {
                 Parser::load_file(&mut rdr, bool_inflate)?.save_file_to_folder(&elem_path)?;
             } else {
-                fs::File::create(elem_path.as_path())?.write_all(&out_data)?;
+                fs::File::create(elem_path.as_path())?.write_all(&item.0)?;
             }
         }
-
         Ok(true)
     }
 
@@ -97,12 +114,15 @@ impl Parser {
         let (_, elems_addrs) = Parser::read_content(file_name)?;
         let (rawdata, h1) =
             Parser::start_file_reader_thread(path::PathBuf::from(file_name), elems_addrs);
+        let (inf_data, h2) = Parser::start_inflate_thread(rawdata);
 
-        let result = Parser::start_file_parse(rawdata, p_dir, bool_inflate);
+        let result = Parser::start_file_parse(inf_data, p_dir, bool_inflate);
 
         let r1 = h1.join().unwrap();
+        let r2 = h2.join().unwrap();
 
         r1?;
+        r2?;
 
         result
     }
