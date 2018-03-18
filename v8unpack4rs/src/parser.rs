@@ -4,7 +4,7 @@ use error;
 use std::{cmp, fs, path, str};
 use std::io::{self, BufReader, Cursor, Error as ioError, ErrorKind as ioErrorKind, SeekFrom};
 use std::io::prelude::*;
-use std::sync::mpsc::{channel, Receiver};
+use std::sync::mpsc::{sync_channel, Receiver};
 use std::thread::{spawn, JoinHandle};
 
 use inflate;
@@ -65,7 +65,7 @@ impl Parser {
     fn start_inflate_thread(
         rawdata: Receiver<RawData>,
     ) -> (Receiver<(Vec<u8>, V8Elem)>, JoinHandle<Result<()>>) {
-        let (sender, receiver) = channel();
+        let (sender, receiver) = sync_channel(128);
 
         let handle = spawn(move || {
             for item in rawdata {
@@ -190,7 +190,7 @@ impl Parser {
         file_name: path::PathBuf,
         elems_addrs: Vec<ElemAddr>,
     ) -> (Receiver<RawData>, JoinHandle<Result<()>>) {
-        let (sender, receiver) = channel();
+        let (sender, receiver) = sync_channel(128);
 
         let handle = spawn(move || {
             let file = fs::File::open(file_name)?;
