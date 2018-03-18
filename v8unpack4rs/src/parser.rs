@@ -93,13 +93,14 @@ impl Parser {
         bool_inflate: bool,
     ) -> Result<bool> {
         for item in data {
-            let elem_path = p_dir.join(&item.1.get_name()?);
+            let (out_data, elem) = item;
+            let elem_path = p_dir.join(&elem.get_name()?);
 
-            let mut rdr = Cursor::new(&item.0);
+            let mut rdr = Cursor::new(&out_data);
             if rdr.is_v8file() {
                 Parser::load_file(&mut rdr, bool_inflate)?.save_file_to_folder(&elem_path)?;
             } else {
-                fs::File::create(elem_path.as_path())?.write_all(&item.0)?;
+                fs::File::create(elem_path.as_path())?.write_all(&out_data)?;
             }
         }
         Ok(true)
