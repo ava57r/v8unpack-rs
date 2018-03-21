@@ -64,20 +64,24 @@ impl Parser {
 
     fn start_inflate_thread(
         rawdata: Receiver<RawData>,
-    ) -> (Receiver<(Vec<u8>, V8Elem)>, JoinHandle<Result<()>>) {
+    ) -> (Receiver<RawData>, JoinHandle<Result<()>>) {
         let (sender, receiver) = sync_channel(128);
 
         let handle = spawn(move || {
             for item in rawdata {
-                let (block_data, elem_block_data) = (item.block_data, item.elem_block_data);
+                let (block_data, v8_elem) = (item.block_data, item.v8_elem);
                 let out_data = match inflate::inflate_bytes(&block_data) {
                     Ok(inf_bytes) => inf_bytes,
                     Err(_) => block_data,
                 };
 
-                let elem = V8Elem::new().with_header(elem_block_data);
-
-                if sender.send((out_data, elem)).is_err() {
+                if sender
+                    .send(RawData {
+                        v8_elem: v8_elem,
+                        block_data: out_data,
+                    })
+                    .is_err()
+                {
                     break;
                 }
             }
@@ -88,13 +92,13 @@ impl Parser {
     }
 
     fn start_file_parse(
-        data: Receiver<(Vec<u8>, V8Elem)>,
+        data: Receiver<RawData>,
         p_dir: &path::Path,
         bool_inflate: bool,
     ) -> Result<bool> {
         for item in data {
-            let (out_data, elem) = item;
-            let elem_path = p_dir.join(&elem.get_name()?);
+            let (out_data, v8_elem) = (item.block_data, item.v8_elem);
+            let elem_path = p_dir.join(&v8_elem.get_name()?);
 
             let mut rdr = Cursor::new(&out_data);
             if rdr.is_v8file() {
@@ -209,6 +213,7 @@ impl Parser {
                 }
 
                 let elem_block_data = Parser::read_block_data(&mut buf_reader, &elem_block_header)?;
+                let v8_elem = V8Elem::new().with_header(elem_block_data);
 
                 let mut block_data = vec![];
 
@@ -221,7 +226,7 @@ impl Parser {
 
                 if sender
                     .send(RawData {
-                        elem_block_data,
+                        v8_elem,
                         block_data,
                     })
                     .is_err()
@@ -237,14 +242,13 @@ impl Parser {
 
     fn start_file_write(rawdata: Receiver<RawData>, p_dir: &path::Path) -> Result<bool> {
         for item in rawdata {
-            let v8_elem = V8Elem::new().with_header(item.elem_block_data);
-            let elem_name = v8_elem.get_name()?;
+            let elem_name = item.v8_elem.get_name()?;
 
             let mut file_elem_header = String::new();
             file_elem_header.push_str(&elem_name);
             file_elem_header.push_str(".header");
 
-            fs::File::create(p_dir.join(&file_elem_header))?.write_all(&v8_elem.get_header())?;
+            fs::File::create(p_dir.join(&file_elem_header))?.write_all(&item.v8_elem.get_header())?;
 
             let mut file_elem_data = String::new();
             file_elem_data.push_str(&elem_name);
@@ -442,6 +446,6 @@ impl Parser {
 }
 
 struct RawData {
-    elem_block_data: Vec<u8>,
+    v8_elem: V8Elem,
     block_data: Vec<u8>,
 }
