@@ -7,12 +7,12 @@ use v8unpack4rs::parser;
 
 fn parse(args: Vec<&str>, single_threaded: bool) -> bool {
     if single_threaded {
-        match parser::Parser::unpack_to_directory_no_load(&args[0], &args[1], true, true) {
+        match parser::unpack_to_directory_no_load(&args[0], &args[1], true, true) {
             Ok(b) => b,
             Err(e) => panic!(e.to_string()),
         }
     } else {
-        match parser::Parser::parse_to_folder(&args[0], &args[1], true) {
+        match parser::parse_to_folder(&args[0], &args[1], true) {
             Ok(b) => b,
             Err(e) => panic!(e.to_string()),
         }
@@ -21,12 +21,12 @@ fn parse(args: Vec<&str>, single_threaded: bool) -> bool {
 
 fn unpack(args: Vec<&str>, single_threaded: bool) -> bool {
     if single_threaded {
-        match parser::Parser::unpack_to_folder(&args[0], &args[1]) {
+        match parser::unpack_to_folder(&args[0], &args[1]) {
             Ok(b) => b,
             Err(e) => panic!(e.to_string()),
         }
     } else {
-        match parser::Parser::unpack_pipeline(&args[0], &args[1]) {
+        match parser::unpack_pipeline(&args[0], &args[1]) {
             Ok(b) => b,
             Err(e) => panic!(e.to_string()),
         }
