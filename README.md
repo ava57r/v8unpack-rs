@@ -11,4 +11,15 @@ through `FFI`.
 - `v8unpack4rs` - the library.
 - `v8unpack` - command line utility.
 
-[README_RU.md](README_RU.md)
+## Russian language
+
+Проект основан на базе [dmpas/v8unpack](https://github.com/dmpas/v8unpack)
+и является частично портированной версией парсера.
+
+Задача была попробовать написать парсер файлов `1cd` на RUST.
+
+Проект разделен на 2 части для обеспечения возможности использования из других языков
+через интерфейс внешних функций.
+
+- `v8unpack4rs` - библиотека.
+- `v8unpack` - консольная программа.
