@@ -1,0 +1,10 @@
+/home/andreevlex/Projects/unpacksharp/unpacksharp/obj/x86/Debug/.NETFramework,Version=v4.6.1.AssemblyAttribute.cs
+/home/andreevlex/Projects/unpacksharp/unpacksharp/bin/Debug/unpacksharp.pdb
+/home/andreevlex/Projects/unpacksharp/unpacksharp/bin/Debug/unpacksharp.exe
+/home/andreevlex/Projects/unpacksharp/unpacksharp/obj/x86/Debug/unpacksharp.exe
+/home/andreevlex/Projects/unpacksharp/unpacksharp/obj/x86/Debug/unpacksharp.pdb
+/home/andreevlex/Projects/unpacksharp-example/unpacksharp/obj/x86/Debug/.NETFramework,Version=v4.6.1.AssemblyAttribute.cs
+/home/andreevlex/Projects/unpacksharp-example/unpacksharp/bin/Debug/unpacksharp.pdb
+/home/andreevlex/Projects/unpacksharp-example/unpacksharp/bin/Debug/unpacksharp.exe
+/home/andreevlex/Projects/unpacksharp-example/unpacksharp/obj/x86/Debug/unpacksharp.exe
+/home/andreevlex/Projects/unpacksharp-example/unpacksharp/obj/x86/Debug/unpacksharp.pdb
