@@ -387,6 +387,13 @@ impl V8Elem {
         self
     }
 
+    pub fn get_data(&self) -> Option<&Vec<u8>> {
+        match self.data {
+            Some(ref d) => Some(d),
+            None => None,
+        }
+    }
+
     pub fn with_unpacked_data(mut self, value: V8File) -> Self {
         self.unpacked_data = Some(value);
 
