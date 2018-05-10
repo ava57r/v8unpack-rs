@@ -1,16 +1,18 @@
 use container::*;
 use error;
 
-use std::{fs, path, str};
-use std::io::{BufReader, Cursor, SeekFrom};
 use std::io::prelude::*;
+use std::io::{BufReader, Cursor, SeekFrom};
 use std::sync::mpsc::{sync_channel, Receiver};
 use std::thread::{spawn, JoinHandle};
+use std::{fs, path, str};
 
-use inflate;
 use super::single;
+use inflate;
 
-fn start_inflate_thread(v8_elems: Receiver<V8Elem>) -> (Receiver<V8Elem>, JoinHandle<Result<()>>) {
+fn start_inflate_thread(
+    v8_elems: Receiver<V8Elem>,
+) -> (Receiver<V8Elem>, JoinHandle<Result<()>>) {
     let (sender, receiver) = sync_channel(128);
 
     let handle = spawn(move || {
@@ -56,7 +58,8 @@ fn start_file_parse(
         if let Some(out_data) = v8_elem.get_data() {
             let mut rdr = Cursor::new(&out_data);
             if rdr.is_v8file() {
-                single::load_file(&mut rdr, bool_inflate)?.save_file_to_folder(&elem_path)?;
+                single::load_file(&mut rdr, bool_inflate)?
+                    .save_file_to_folder(&elem_path)?;
             } else {
                 fs::File::create(elem_path.as_path())?.write_all(&out_data)?;
             }
@@ -67,14 +70,19 @@ fn start_file_parse(
     Ok(true)
 }
 
-pub fn parse_to_folder(file_name: &str, dir_name: &str, bool_inflate: bool) -> Result<bool> {
+pub fn parse_to_folder(
+    file_name: &str,
+    dir_name: &str,
+    bool_inflate: bool,
+) -> Result<bool> {
     let p_dir = path::Path::new(dir_name);
     if !p_dir.exists() {
         fs::create_dir(dir_name)?;
     };
 
     let (_, elems_addrs) = read_content(file_name)?;
-    let (v8_elems, h1) = start_file_reader_thread(path::PathBuf::from(file_name), elems_addrs);
+    let (v8_elems, h1) =
+        start_file_reader_thread(path::PathBuf::from(file_name), elems_addrs);
     let (inf_data, h2) = start_inflate_thread(v8_elems);
 
     let result = start_file_parse(inf_data, p_dir, bool_inflate);
@@ -109,7 +117,8 @@ fn start_file_reader_thread(
                 return Err(error::V8Error::NotV8File);
             }
 
-            let elem_block_data = single::read_block_data(&mut buf_reader, &elem_block_header)?;
+            let elem_block_data =
+                single::read_block_data(&mut buf_reader, &elem_block_header)?;
             let mut v8_elem = V8Elem::new().with_header(elem_block_data);
 
             if cur_elem.elem_data_addr != V8_MAGIC_NUMBER {
@@ -137,7 +146,8 @@ fn start_file_write(v8_elems: Receiver<V8Elem>, p_dir: &path::Path) -> Result<bo
         let elem_name = v8_elem.get_name()?;
 
         let file_elem_header = format!("{0}.{1}", elem_name, "header");
-        fs::File::create(p_dir.join(&file_elem_header))?.write_all(&v8_elem.get_header())?;
+        fs::File::create(p_dir.join(&file_elem_header))?
+            .write_all(&v8_elem.get_header())?;
 
         let file_elem_data = format!("{0}.{1}", elem_name, "data");
         if let Some(block_data) = v8_elem.get_data() {
@@ -157,7 +167,8 @@ pub fn unpack_pipeline(file_name: &str, dir_name: &str) -> Result<bool> {
     let (file_header, elems_addrs) = read_content(file_name)?;
     fs::File::create(p_dir.join("FileHeader"))?.write_all(&file_header.into_bytes()?)?;
 
-    let (v8_elems, h1) = start_file_reader_thread(path::PathBuf::from(file_name), elems_addrs);
+    let (v8_elems, h1) =
+        start_file_reader_thread(path::PathBuf::from(file_name), elems_addrs);
 
     let result = start_file_write(v8_elems, p_dir);
 

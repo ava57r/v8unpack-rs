@@ -1,9 +1,9 @@
 use container::*;
 use error;
 
-use std::{cmp, fs, path, str};
-use std::io::{BufReader, Cursor, Error as ioError, ErrorKind as ioErrorKind, SeekFrom};
 use std::io::prelude::*;
+use std::io::{BufReader, Cursor, Error as ioError, ErrorKind as ioErrorKind, SeekFrom};
+use std::{cmp, fs, path, str};
 
 use inflate;
 
@@ -99,7 +99,8 @@ pub fn unpack_to_folder(file_name: &str, dir_name: &str) -> Result<bool> {
         file_elem_header.push_str(&elem_name);
         file_elem_header.push_str(".header");
 
-        fs::File::create(p_dir.join(&file_elem_header))?.write_all(&v8_elem.get_header())?;
+        fs::File::create(p_dir.join(&file_elem_header))?
+            .write_all(&v8_elem.get_header())?;
 
         if cur_elem.elem_data_addr != V8_MAGIC_NUMBER {
             buf_reader.seek(SeekFrom::Start(cur_elem.elem_data_addr as u64))?;
@@ -115,7 +116,10 @@ pub fn unpack_to_folder(file_name: &str, dir_name: &str) -> Result<bool> {
     Ok(true)
 }
 
-pub fn read_elems_addrs<R>(src: &mut R, block_header: &BlockHeader) -> Result<Vec<ElemAddr>>
+pub fn read_elems_addrs<R>(
+    src: &mut R,
+    block_header: &BlockHeader,
+) -> Result<Vec<ElemAddr>>
 where
     R: Read + Seek,
 {

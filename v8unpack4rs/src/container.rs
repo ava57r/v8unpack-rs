@@ -1,6 +1,6 @@
-use std::{fmt, fs, path, result, str, u32};
-use std::io::{BufReader, Cursor, Error as ioError, ErrorKind as ioErrorKind, SeekFrom};
 use std::io::prelude::*;
+use std::io::{BufReader, Cursor, Error as ioError, ErrorKind as ioErrorKind, SeekFrom};
+use std::{fmt, fs, path, result, str, u32};
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::convert::AsMut;
@@ -14,7 +14,8 @@ pub const V8_MAGIC_NUMBER: u32 = 0x7fffffff;
 
 /// Trait for to get basic information about the container.
 pub trait V8Container {
-    /// This method checks that the container is actually the correct file of 1C: Enterprise.
+    /// This method checks that the container is actually the correct file of
+    /// 1C: Enterprise.
     fn is_v8file(&mut self) -> bool;
 
     /// Returns root file header from container.
@@ -254,11 +255,12 @@ impl BlockHeader {
     /// Checks that the block header for correctness.
     pub fn is_correct(&self) -> bool {
         self.eol_0d == b'\r' && self.eol_0a == b'\n' && self.space1 == b'\x20'
-            && self.space2 == b'\x20' && self.space3 == b'\x20' && self.eol2_0d == b'\r'
-            && self.eol2_0a == b'\n'
+            && self.space2 == b'\x20' && self.space3 == b'\x20'
+            && self.eol2_0d == b'\r' && self.eol2_0a == b'\n'
     }
 
-    /// Gets the value of the size of the data section from hexadecimal representation.
+    /// Gets the value of the size of the data section from hexadecimal
+    /// representation.
     pub fn get_data_size(&self) -> Result<u32> {
         Self::get_u32(&self.data_size_hex)
     }
@@ -268,7 +270,8 @@ impl BlockHeader {
         Self::get_u32(&self.page_size_hex)
     }
 
-    /// Gets the offset of the next page of data from hexadecimal representation.
+    /// Gets the offset of the next page of data from hexadecimal
+    /// representation.
     pub fn get_next_page_addr(&self) -> Result<u32> {
         Self::get_u32(&self.next_page_addr_hex)
     }
@@ -429,7 +432,8 @@ impl V8Elem {
 pub struct V8File {
     /// The file header `1cd`.
     file_header: FileHeader,
-    ///a collection of elements that describe offsets of the header and data sections.
+    ///a collection of elements that describe offsets of the header and data
+    /// sections.
     elems_addrs: Vec<ElemAddr>,
     ///
     elems: Vec<V8Elem>,
