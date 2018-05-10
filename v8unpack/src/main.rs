@@ -3,7 +3,7 @@ extern crate clap;
 extern crate v8unpack4rs;
 
 use clap::{App, Arg};
-use v8unpack4rs::parser;
+use v8unpack4rs::{parser, builder};
 
 fn parse(args: Vec<&str>, single_threaded: bool) -> bool {
     if single_threaded {
@@ -30,6 +30,13 @@ fn unpack(args: Vec<&str>, single_threaded: bool) -> bool {
             Ok(b) => b,
             Err(e) => panic!(e.to_string()),
         }
+    }
+}
+
+fn pack(args: Vec<&str>, _single_threaded: bool) -> bool {
+    match builder::pack_from_folder(&args[0], &args[1]) {
+        Ok(b) => b,
+        Err(e) => panic!(e.to_string()),
     }
 }
 
@@ -64,6 +71,13 @@ fn main() {
                 .long("single-threaded")
                 .help("Do all the work on a single thread."),
         )
+        .arg(
+            Arg::with_name("pack")
+                .long("pack")
+                .help("Package the binaries in *.cf")
+                .takes_value(true)
+                .value_names(&["INPUTFILE", "OUTDIR"]),
+        )
         .get_matches();
 
     let single_threaded = app_m.is_present("single-threaded");
@@ -78,6 +92,13 @@ fn main() {
     if let Some(vals) = app_m.values_of("unpack") {
         let v: Vec<&str> = vals.collect();
         if unpack(v, single_threaded) {
+            std::process::exit(0);
+        }
+    }
+
+    if let Some(vals) = app_m.values_of("pack") {
+        let v: Vec<&str> = vals.collect();
+        if pack(v, true) {
             std::process::exit(0);
         }
     }

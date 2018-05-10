@@ -2,6 +2,7 @@ extern crate byteorder;
 extern crate deflate;
 extern crate inflate;
 
+pub mod builder;
 pub mod container;
 pub mod error;
 pub mod parser;
