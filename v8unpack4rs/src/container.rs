@@ -9,6 +9,8 @@ use error;
 
 pub type Result<T> = result::Result<T, error::V8Error>;
 
+pub const V8_DEFAULT_PAGE_SIZE: u32 = 512;
+
 /// Indicates that no further data.
 pub const V8_MAGIC_NUMBER: u32 = 0x7fffffff;
 
@@ -203,6 +205,22 @@ impl BlockHeader {
     /// The size of the data in the file, represented as C structures.
     pub const SIZE: u32 = 1 + 1 + 8 + 1 + 8 + 1 + 8 + 1 + 1 + 1;
 
+    pub fn new(data_size: u32, page_size: u32, next_page_addr: u32) -> BlockHeader {
+        let mut default = BlockHeader::default();
+        let convert = |value| {
+            let hex = format!("{:08x}", value);
+            let bytes = hex.into_bytes();
+            let arr: [u8; 8] = clone_into_array(&bytes[0..8]);
+
+            arr
+        };
+        
+        default.data_size_hex = convert(data_size);
+        default.page_size_hex = convert(page_size);
+        default.next_page_addr_hex = convert(next_page_addr);
+
+        default
+    }
     /// Creates an instance of `BlockHeader` from a stream of bytes.
     pub fn from_raw_parts<R>(src: &mut R) -> Result<BlockHeader>
     where
@@ -330,15 +348,26 @@ impl ElemAddr {
     where
         R: Read + Seek,
     {
-        let _elem_header_addr = rdr.read_u32::<LittleEndian>()?;
-        let _elem_data_addr = rdr.read_u32::<LittleEndian>()?;
-        let _fffffff = rdr.read_u32::<LittleEndian>()?;
+        let elem_header_addr = rdr.read_u32::<LittleEndian>()?;
+        let elem_data_addr = rdr.read_u32::<LittleEndian>()?;
+        let fffffff = rdr.read_u32::<LittleEndian>()?;
 
         Ok(ElemAddr {
-            elem_header_addr: _elem_header_addr,
-            elem_data_addr: _elem_data_addr,
-            fffffff: _fffffff,
+            elem_header_addr,
+            elem_data_addr,
+            fffffff,
         })
+    }
+
+    /// Converts `ElemAddr` an array of bytes
+    pub fn into_bytes(self) -> Result<Vec<u8>> {
+        let mut result = Vec::new();
+
+        result.write_u32::<LittleEndian>(self.elem_header_addr)?;
+        result.write_u32::<LittleEndian>(self.elem_data_addr)?;
+        result.write_u32::<LittleEndian>(self.fffffff)?;
+
+        Ok(result)
     }
 }
 

@@ -3,7 +3,7 @@ extern crate clap;
 extern crate v8unpack4rs;
 
 use clap::{App, Arg};
-use v8unpack4rs::{parser, builder};
+use v8unpack4rs::{builder, parser};
 
 fn parse(args: Vec<&str>, single_threaded: bool) -> bool {
     if single_threaded {
