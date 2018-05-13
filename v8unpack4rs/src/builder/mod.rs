@@ -52,17 +52,20 @@ pub fn pack_from_folder(dirname: &str, filename_out: &str) -> Result<bool> {
         path::Path::new(filename_out),
     ).expect("SaveFile. Error in creating file!");
 
+    let mut file_out = fs::OpenOptions::new()
+        .append(true)
+        .open(filename_out)?;
     let pack_elements = prepare_pack_files(dirname)?;
 
-    save_elem_addrs(&pack_elements, filename_out)?;
-    save_data(pack_elements, filename_out)?;
+    save_elem_addrs(&pack_elements, &mut file_out)?;
+    save_data(pack_elements, &mut file_out)?;
 
     Ok(true)
 }
 
 fn save_elem_addrs(
     pack_elems: &Vec<PackElementEntry>,
-    filename_out: &str,
+    file_out: &mut fs::File,
 ) -> Result<()> {
     let mut elem_addrs_bytes: Vec<u8> =
         Vec::with_capacity(pack_elems.len() * ElemAddr::SIZE as usize);
@@ -91,24 +94,24 @@ fn save_elem_addrs(
             .extend(ElemAddr::new(elem_data_addr, elem_header_addr).into_bytes()?);
     }
 
-    save_block_data(filename_out, elem_addrs_bytes, V8_DEFAULT_PAGE_SIZE)?;
+    save_block_data(file_out, elem_addrs_bytes, V8_DEFAULT_PAGE_SIZE)?;
 
     Ok(())
 }
 
-fn save_data(pack_elems: Vec<PackElementEntry>, filename_out: &str) -> Result<()> {
+fn save_data(pack_elems: Vec<PackElementEntry>, file_out: &mut fs::File) -> Result<()> {
     for elem in pack_elems {
         {
             let mut header_file = fs::File::open(elem.header_file)?;
             let mut buf = vec![];
             header_file.read_to_end(&mut buf)?;
-            save_block_data(filename_out, buf, elem.header_size as u32)?;
+            save_block_data(file_out, buf, elem.header_size as u32)?;
         }
         {
             let mut data_file = fs::File::open(elem.data_file)?;
             let mut buf = vec![];
             data_file.read_to_end(&mut buf)?;
-            save_block_data(filename_out, buf, V8_DEFAULT_PAGE_SIZE)?;
+            save_block_data(file_out, buf, V8_DEFAULT_PAGE_SIZE)?;
         }
     }
 
@@ -116,7 +119,7 @@ fn save_data(pack_elems: Vec<PackElementEntry>, filename_out: &str) -> Result<()
 }
 
 fn save_block_data(
-    filename_out: &str,
+    file_out: &mut fs::File,
     block_data: Vec<u8>,
     page_size: u32,
 ) -> Result<()> {
@@ -133,9 +136,6 @@ fn save_block_data(
 
     let block_header = BlockHeader::new(block_size, page_size_actual, V8_MAGIC_NUMBER);
 
-    let mut file_out = fs::OpenOptions::new()
-        .append(true)
-        .open(filename_out)?;
     file_out.write_all(&block_header.into_bytes()?)?;
     file_out.write_all(&block_data)?;
     let mut i = 0;
