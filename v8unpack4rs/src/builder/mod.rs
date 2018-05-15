@@ -52,9 +52,7 @@ pub fn pack_from_folder(dirname: &str, filename_out: &str) -> Result<bool> {
         path::Path::new(filename_out),
     ).expect("SaveFile. Error in creating file!");
 
-    let mut file_out = fs::OpenOptions::new()
-        .append(true)
-        .open(filename_out)?;
+    let mut file_out = fs::File::create(filename_out)?;
     let pack_elements = prepare_pack_files(dirname)?;
 
     save_elem_addrs(&pack_elements, &mut file_out)?;
@@ -138,11 +136,56 @@ fn save_block_data(
 
     file_out.write_all(&block_header.into_bytes()?)?;
     file_out.write_all(&block_data)?;
+
+    write_terminal_zeros(file_out, page_size_actual - block_size)?;
+
+    Ok(())
+}
+
+fn write_terminal_zeros(file_out: &mut fs::File, count: u32) -> Result<()> {
     let mut i = 0;
-    while i < (page_size_actual - block_size) {
+    while i < count {
         file_out.write(b"\0")?;
         i += 1;
     }
 
     Ok(())
+}
+
+pub fn build_cf_file(dirname: &str, filename_out: &str) -> Result<bool> {
+    let elems_num: u32 = fs::read_dir(dirname)?
+        .filter(|p| match p {
+            Ok(_) => true,
+            Err(_) => false,
+        })
+        .fold(0, |sum, _| sum + 1);
+
+    let file_header = FileHeader::new(V8_MAGIC_NUMBER, V8_DEFAULT_PAGE_SIZE, 0);
+    let mut TOC: Vec<ElemAddr> = Vec::with_capacity(elems_num as usize);
+    let mut cur_block_addr = FileHeader::SIZE + BlockHeader::SIZE;
+    cur_block_addr += cmp::max(ElemAddr::SIZE * elems_num, V8_DEFAULT_PAGE_SIZE);
+
+    let mut file_out = fs::File::create(filename_out)?;
+    write_terminal_zeros(&mut file_out, cur_block_addr)?;
+
+    for entry in fs::read_dir(dirname)? {
+        let entry = entry?;
+        if let Ok(name) = entry.file_name().into_string() {
+            let header_size = ElemHeaderBegin::SIZE as usize * name.len() * 2 + 4;
+            let header =
+                vec![0; header_size];
+            let mut element = V8Elem::new().with_header(header);
+            element.set_name(name);
+            
+            let elem_header_addr  = cur_block_addr;
+
+            let elem_data_addr = 0; 
+            let elem_addr = ElemAddr::new(elem_data_addr, elem_header_addr);
+
+        } else {
+            panic!("Not UTF-8!");
+        }
+    }
+
+    Ok(true)
 }

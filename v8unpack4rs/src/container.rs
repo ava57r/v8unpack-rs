@@ -214,7 +214,7 @@ impl BlockHeader {
 
             arr
         };
-        
+
         default.data_size_hex = convert(data_size);
         default.page_size_hex = convert(page_size);
         default.next_page_addr_hex = convert(next_page_addr);
@@ -454,6 +454,8 @@ impl V8Elem {
 
         Ok(String::from_utf8(v_raw_name)?)
     }
+
+    pub fn set_name(&mut self, value: String) {}
 }
 
 /// Describes the structure of the file `1cd`.

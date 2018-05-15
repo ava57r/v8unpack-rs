@@ -40,6 +40,13 @@ fn pack(args: Vec<&str>, _single_threaded: bool) -> bool {
     }
 }
 
+fn build(args: Vec<&str>, _single_threaded: bool) -> bool {
+    match builder::build_cf_file(&args[0], &args[1]) {
+        Ok(b) => b,
+        Err(e) => panic!(e.to_string()),
+    }
+}
+
 fn main() {
     let app_m = App::new("v8unpack")
         .version(crate_version!())
@@ -78,6 +85,14 @@ fn main() {
                 .takes_value(true)
                 .value_names(&["INPUTFILE", "OUTDIR"]),
         )
+        .arg(
+            Arg::with_name("build")
+                .short("b")
+                .long("build")
+                .help("Build the binaries in *.cf from source files")
+                .takes_value(true)
+                .value_names(&["INPUTFILE", "OUTDIR"]),
+        )
         .get_matches();
 
     let single_threaded = app_m.is_present("single-threaded");
@@ -102,4 +117,10 @@ fn main() {
             std::process::exit(0);
         }
     }
-}
+
+    if let Some(vals) = app_m.values_of("build") {
+        let v: Vec<&str> = vals.collect();
+        if build(v, true) {
+            std::process::exit(0);
+        }
+    }}

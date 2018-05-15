@@ -1,0 +1,52 @@
+{
+    // Используйте IntelliSense, чтобы узнать о возможных атрибутах.
+    // Наведите указатель мыши, чтобы просмотреть описания существующих атрибутов.
+    // Для получения дополнительной информации посетите: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+{
+    "type": "lldb",
+    "request": "launch",
+    "name": "Cargo launch",
+    "cargo": {
+        "args": [
+            "run",
+            "-p v8unpack",
+            "--bin=v8unpack"
+        ]
+    },
+    "program": "${cargo:program}",
+    "args": []
+},
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug v8unpack",
+            "cargo": {
+                "args": [
+                    "run",
+                    "-p v8unpack",
+                    "--bin=v8unpack"
+                ]
+            },
+            "args": [
+                ""
+            ],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug tests in v8unpack",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=v8unpack"
+                ]
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}
