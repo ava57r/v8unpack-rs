@@ -13,6 +13,8 @@ license = "MIT"
 deflate = "0.7.17"
 inflate = "0.3.3"
 byteorder = "1.2.1"
+encoding = "0.2.33"
+log = "0.4"
 
 [lib]
 crate_type = ["rlib", "cdylib"]

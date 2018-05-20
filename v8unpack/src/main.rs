@@ -40,8 +40,8 @@ fn pack(args: Vec<&str>, _single_threaded: bool) -> bool {
     }
 }
 
-fn build(args: Vec<&str>, _single_threaded: bool) -> bool {
-    match builder::build_cf_file(&args[0], &args[1]) {
+fn build(args: Vec<&str>, no_deflate: bool) -> bool {
+    match builder::build_cf_file(&args[0], &args[1], no_deflate) {
         Ok(b) => b,
         Err(e) => panic!(e.to_string()),
     }
@@ -93,9 +93,16 @@ fn main() {
                 .takes_value(true)
                 .value_names(&["INPUTFILE", "OUTDIR"]),
         )
+        .arg(
+            Arg::with_name("no-deflate")
+                .short("n")
+                .long("no-deflate")
+                .help("Not deflate"),
+        )
         .get_matches();
 
     let single_threaded = app_m.is_present("single-threaded");
+    let no_deflate = app_m.is_present("no-deflate");
 
     if let Some(vals) = app_m.values_of("parse") {
         let v: Vec<&str> = vals.collect();
@@ -120,7 +127,8 @@ fn main() {
 
     if let Some(vals) = app_m.values_of("build") {
         let v: Vec<&str> = vals.collect();
-        if build(v, true) {
+        if build(v, no_deflate) {
             std::process::exit(0);
         }
-    }}
+    }
+}

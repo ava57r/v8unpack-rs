@@ -258,7 +258,7 @@ where
                 .with_header(elem_block_header_data)
                 .with_data(out_data)
                 .with_unpacked_data(unpacked_data)
-                .is_v8file(is_v8file),
+                .this_v8file(is_v8file),
         );
     }
 

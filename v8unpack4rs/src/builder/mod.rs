@@ -1,5 +1,6 @@
 use container::*;
-use std::io::{Read, Write};
+use std::io::prelude::*;
+use std::io::{Read, SeekFrom, Write};
 use std::{cmp, fs, path, ffi::OsStr, u32};
 
 #[derive(Debug)]
@@ -52,7 +53,9 @@ pub fn pack_from_folder(dirname: &str, filename_out: &str) -> Result<bool> {
         path::Path::new(filename_out),
     ).expect("SaveFile. Error in creating file!");
 
-    let mut file_out = fs::File::create(filename_out)?;
+    let mut file_out = fs::OpenOptions::new()
+        .append(true)
+        .open(filename_out)?;
     let pack_elements = prepare_pack_files(dirname)?;
 
     save_elem_addrs(&pack_elements, &mut file_out)?;
@@ -92,7 +95,7 @@ fn save_elem_addrs(
             .extend(ElemAddr::new(elem_data_addr, elem_header_addr).into_bytes()?);
     }
 
-    save_block_data(file_out, elem_addrs_bytes, V8_DEFAULT_PAGE_SIZE)?;
+    save_block_data(file_out, &elem_addrs_bytes, V8_DEFAULT_PAGE_SIZE)?;
 
     Ok(())
 }
@@ -103,13 +106,13 @@ fn save_data(pack_elems: Vec<PackElementEntry>, file_out: &mut fs::File) -> Resu
             let mut header_file = fs::File::open(elem.header_file)?;
             let mut buf = vec![];
             header_file.read_to_end(&mut buf)?;
-            save_block_data(file_out, buf, elem.header_size as u32)?;
+            save_block_data(file_out, &buf, elem.header_size as u32)?;
         }
         {
             let mut data_file = fs::File::open(elem.data_file)?;
             let mut buf = vec![];
             data_file.read_to_end(&mut buf)?;
-            save_block_data(file_out, buf, V8_DEFAULT_PAGE_SIZE)?;
+            save_block_data(file_out, &buf, V8_DEFAULT_PAGE_SIZE)?;
         }
     }
 
@@ -118,7 +121,7 @@ fn save_data(pack_elems: Vec<PackElementEntry>, file_out: &mut fs::File) -> Resu
 
 fn save_block_data(
     file_out: &mut fs::File,
-    block_data: Vec<u8>,
+    block_data: &Vec<u8>,
     page_size: u32,
 ) -> Result<()> {
     if block_data.len() > u32::MAX as usize {
@@ -152,7 +155,11 @@ fn write_terminal_zeros(file_out: &mut fs::File, count: u32) -> Result<()> {
     Ok(())
 }
 
-pub fn build_cf_file(dirname: &str, filename_out: &str) -> Result<bool> {
+pub fn build_cf_file(
+    dirname: &str,
+    filename_out: &str,
+    no_deflate: bool,
+) -> Result<bool> {
     let elems_num: u32 = fs::read_dir(dirname)?
         .filter(|p| match p {
             Ok(_) => true,
@@ -160,32 +167,116 @@ pub fn build_cf_file(dirname: &str, filename_out: &str) -> Result<bool> {
         })
         .fold(0, |sum, _| sum + 1);
 
-    let file_header = FileHeader::new(V8_MAGIC_NUMBER, V8_DEFAULT_PAGE_SIZE, 0);
     let mut TOC: Vec<ElemAddr> = Vec::with_capacity(elems_num as usize);
     let mut cur_block_addr = FileHeader::SIZE + BlockHeader::SIZE;
     cur_block_addr += cmp::max(ElemAddr::SIZE * elems_num, V8_DEFAULT_PAGE_SIZE);
 
     let mut file_out = fs::File::create(filename_out)?;
     write_terminal_zeros(&mut file_out, cur_block_addr)?;
+    TOC.extend(process_files(
+        dirname,
+        &mut file_out,
+        &mut cur_block_addr,
+        no_deflate,
+    )?);
 
-    for entry in fs::read_dir(dirname)? {
-        let entry = entry?;
-        if let Ok(name) = entry.file_name().into_string() {
-            let header_size = ElemHeaderBegin::SIZE as usize * name.len() * 2 + 4;
-            let header =
-                vec![0; header_size];
-            let mut element = V8Elem::new().with_header(header);
-            element.set_name(name);
-            
-            let elem_header_addr  = cur_block_addr;
-
-            let elem_data_addr = 0; 
-            let elem_addr = ElemAddr::new(elem_data_addr, elem_header_addr);
-
-        } else {
-            panic!("Not UTF-8!");
-        }
+    let file_header = FileHeader::new(V8_MAGIC_NUMBER, V8_DEFAULT_PAGE_SIZE, 0);
+    file_out.seek(SeekFrom::Start(0))?;
+    file_out.write_all(&file_header.into_bytes()?)?;
+    for toc_elm in TOC.into_iter() {
+        file_out.write_all(&toc_elm.into_bytes()?)?;
     }
 
     Ok(true)
+}
+
+fn process_files(
+    dirname: &str,
+    file_out: &mut fs::File,
+    cur_block_addr: &mut u32,
+    no_deflate: bool,
+) -> Result<Vec<ElemAddr>> {
+    let mut result = vec![];
+    for entry in fs::read_dir(dirname)? {
+        let entry = entry?;
+        if let Ok(name) = entry.file_name().into_string() {
+            let header = vec![0; ElemHeaderBegin::SIZE as usize];
+            let mut element = V8Elem::new().with_header(header);
+            element.set_name(&name);
+
+            let elem_header_addr = *cur_block_addr;
+            {
+                let elem_header = element.get_header();
+                save_block_data(file_out, elem_header, elem_header.len() as u32)?;
+                *cur_block_addr += elem_header.len() as u32;
+            }
+            let elem_data_addr = *cur_block_addr;
+
+            let elem_addr = ElemAddr::new(elem_data_addr, elem_header_addr);
+            result.push(elem_addr);
+
+            if let Ok(file_type) = entry.file_type() {
+                if file_type.is_dir() {
+                    process_directory(
+                        file_out,
+                        &mut element,
+                        dirname,
+                        &name,
+                        no_deflate,
+                    )?;
+                } else {
+                    process_v8file(file_out, &mut element, dirname, &name, no_deflate)?;
+                }
+            } else {
+                error!("Couldn't get file type for {:?}", entry.path());
+            }
+        } else {
+            error!("Couldn't get file name for {:?}", entry.path());
+        }
+    }
+
+    Ok(result)
+}
+fn process_directory(
+    file_out: &mut fs::File,
+    element: &mut V8Elem,
+    dirname: &str,
+    name: &str,
+    no_deflate: bool,
+) -> Result<()> {
+    let new_dir = path::Path::new(dirname).join(name);
+    let mut v8 = V8File::new();
+    v8.load_file_from_folder(new_dir)?;
+    element.set_v8file(true);
+    element.set_unpacked_data(Some(v8));
+    element.pack(!no_deflate)?;
+
+    if let Some(data) = element.get_data() {
+        save_block_data(file_out, data, data.len() as u32)?;
+    }
+
+    Ok(())
+}
+
+fn process_v8file(
+    file_out: &mut fs::File,
+    element: &mut V8Elem,
+    dirname: &str,
+    name: &str,
+    no_deflate: bool,
+) -> Result<()> {
+    element.set_v8file(false);
+    let mut data = vec![];
+    let p_file = path::Path::new(dirname).join(name);
+    let mut cur_file = fs::File::open(p_file)?;
+    cur_file.read_to_end(&mut data)?;
+
+    element.set_data(Some(data));
+    element.pack(!no_deflate)?;
+
+    if let Some(data) = element.get_data() {
+        save_block_data(file_out, data, data.len() as u32)?;
+    }
+
+    Ok(())
 }

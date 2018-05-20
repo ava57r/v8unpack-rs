@@ -1,9 +1,14 @@
 use std::io::prelude::*;
 use std::io::{BufReader, Cursor, Error as ioError, ErrorKind as ioErrorKind, SeekFrom};
-use std::{fmt, fs, path, result, str, u32};
+use std::{cmp, fmt, fs, path, result, str, u32};
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::convert::AsMut;
+
+use encoding::all::UTF_16LE;
+use encoding::{EncoderTrap, Encoding};
+
+use deflate;
 
 use error;
 
@@ -426,17 +431,33 @@ impl V8Elem {
         }
     }
 
+    pub fn set_data(&mut self, value: Option<Vec<u8>>) {
+        self.data = value;
+    }
+
     pub fn with_unpacked_data(mut self, value: V8File) -> Self {
         self.unpacked_data = Some(value);
 
         self
     }
 
+    pub fn set_unpacked_data(&mut self, value: Option<V8File>) {
+        self.unpacked_data = value;
+    }
+
     ///
-    pub fn is_v8file(mut self, value: bool) -> Self {
+    pub fn this_v8file(mut self, value: bool) -> Self {
         self.is_v8file = value;
 
         self
+    }
+
+    pub fn get_v8file(&self) -> bool {
+        self.is_v8file
+    }
+
+    pub fn set_v8file(&mut self, value: bool) {
+        self.is_v8file = value;
     }
 
     /// Gets the name of the file in the container.
@@ -455,7 +476,50 @@ impl V8Elem {
         Ok(String::from_utf8(v_raw_name)?)
     }
 
-    pub fn set_name(&mut self, value: String) {}
+    pub fn set_name(&mut self, value: &str) {
+        if let Ok(utf_16) = UTF_16LE.encode(value, EncoderTrap::Strict) {
+            self.header.extend(utf_16.iter());
+            self.header.push(b'\0');
+            self.header.extend(&[0, 0, 0, 0]);
+        }
+    }
+
+    pub fn pack(&mut self, deflate_: bool) -> Result<()> {
+        if !self.is_v8file {
+            if deflate_ {
+                let result = match self.data {
+                    Some(ref data) => deflate::deflate_bytes(data),
+                    None => {
+                        error!("Couldn't get data from V8Elem");
+
+                        vec![]
+                    }
+                };
+
+                self.set_data(Some(result));
+            }
+        } else {
+            let data_buffer = match self.unpacked_data {
+                Some(ref unpacked_data) => unpacked_data.get_data()?,
+                None => {
+                    error!("Couldn't get data from V8File");
+
+                    vec![]
+                }
+            };
+            self.set_unpacked_data(None);
+
+            if deflate_ {
+                let result = deflate::deflate_bytes(&data_buffer);
+                self.set_data(Some(result));
+            } else {
+                self.set_data(Some(data_buffer));
+            }
+            self.is_v8file = false;
+        }
+
+        Ok(())
+    }
 }
 
 /// Describes the structure of the file `1cd`.
@@ -522,6 +586,164 @@ impl V8File {
         }
 
         Ok(true)
+    }
+
+    pub fn load_file_from_folder(&mut self, dirname: path::PathBuf) -> Result<()> {
+        self.file_header = FileHeader::new(V8_MAGIC_NUMBER, V8_DEFAULT_PAGE_SIZE, 0);
+        self.elems.clear();
+
+        for entry in fs::read_dir(dirname.as_path())? {
+            let entry = entry?;
+            if let Ok(name) = entry.file_name().into_string() {
+                let header = vec![0; ElemHeaderBegin::SIZE as usize];
+                let mut element = V8Elem::new().with_header(header);
+                element.set_name(&name);
+
+                if let Ok(file_type) = entry.file_type() {
+                    if file_type.is_dir() {
+                        let new_dir = dirname.join(name);
+                        let mut v8 = V8File::new();
+                        v8.load_file_from_folder(new_dir)?;
+                        element.set_v8file(true);
+                        element.set_unpacked_data(Some(v8));
+                        element.pack(false)?;
+                    } else {
+                        element.set_v8file(false);
+                        let mut file = fs::File::open(entry.path())?;
+                        let mut buf = vec![];
+                        file.read_to_end(&mut buf)?;
+                        element.set_data(Some(buf));
+                    }
+                } else {
+                    error!("Couldn't get file type for {:?}", entry.path());
+                }
+                self.elems.push(element);
+            } else {
+                error!("Couldn't get file name for {:?}", entry.path());
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn get_data(&self) -> Result<Vec<u8>> {
+        let mut result = vec![];
+        let fh = self.file_header.clone();
+        result.extend(fh.into_bytes()?);
+
+        let mut elem_addrs_bytes: Vec<u8> =
+            Vec::with_capacity(self.elems.len() * ElemAddr::SIZE as usize);
+
+        let mut cur_elem_addr = FileHeader::SIZE + BlockHeader::SIZE;
+        cur_elem_addr += cmp::max(
+            ElemAddr::SIZE * self.elems.len() as u32,
+            V8_DEFAULT_PAGE_SIZE,
+        );
+
+        let mut new_elems: Vec<V8Elem> = vec![];
+
+        for elem in self.elems.iter() {
+            if elem.get_v8file() {
+                let data_buffer = match elem.unpacked_data {
+                    Some(ref unpacked_data) => unpacked_data.get_data()?,
+                    None => {
+                        error!("Couldn't get data from V8File");
+
+                        vec![]
+                    }
+                };
+
+                new_elems.push(V8Elem {
+                    header: elem.header.clone(),
+                    data: Some(data_buffer),
+                    unpacked_data: None,
+                    is_v8file: false,
+                });
+            }
+            let data_new = match elem.data {
+                Some(ref data) => data.clone(),
+                None => vec![],
+            };
+
+            new_elems.push(
+                V8Elem::new()
+                    .with_header(elem.header.clone())
+                    .with_data(data_new),
+            );
+        }
+
+        for elem in new_elems.iter() {
+            let elem_header_addr = cur_elem_addr;
+            cur_elem_addr += BlockHeader::SIZE + elem.header.len() as u32;
+
+            let elem_data_addr = cur_elem_addr;
+            cur_elem_addr += BlockHeader::SIZE;
+            if let Some(ref data) = elem.data {
+                cur_elem_addr += cmp::max(data.len() as u32, V8_DEFAULT_PAGE_SIZE);
+            } else {
+                error!("Empty!");
+            }
+
+            elem_addrs_bytes
+                .extend(ElemAddr::new(elem_data_addr, elem_header_addr).into_bytes()?);
+        }
+
+        V8File::save_block_data_to_buffer(
+            &mut result,
+            &elem_addrs_bytes,
+            elem_addrs_bytes.len() as u32,
+        )?;
+
+        for elem in new_elems.iter() {
+            V8File::save_block_data_to_buffer(
+                &mut result,
+                &elem.header,
+                elem.header.len() as u32,
+            )?;
+
+            if let Some(ref data) = elem.data {
+                V8File::save_block_data_to_buffer(
+                    &mut result,
+                    data,
+                    V8_DEFAULT_PAGE_SIZE,
+                )?;
+            } else {
+                error!("Empty!");
+            }
+        }
+
+        Ok(result)
+    }
+
+    fn save_block_data_to_buffer(
+        buffer: &mut Vec<u8>,
+        block_data: &Vec<u8>,
+        page_size: u32,
+    ) -> Result<()> {
+        if block_data.len() > u32::MAX as usize {
+            panic!("Invalid data length");
+        }
+
+        let block_size = block_data.len() as u32;
+        let page_size_actual = if page_size < block_size {
+            block_size
+        } else {
+            page_size
+        };
+
+        let block_header =
+            BlockHeader::new(block_size, page_size_actual, V8_MAGIC_NUMBER);
+
+        buffer.extend(&block_header.into_bytes()?);
+        buffer.extend(block_data.iter());
+
+        let mut i = 0;
+        while i < (page_size_actual - block_size) {
+            buffer.push(0);
+            i += 1;
+        }
+
+        Ok(())
     }
 }
 
