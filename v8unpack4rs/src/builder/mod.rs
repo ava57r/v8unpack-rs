@@ -166,7 +166,7 @@ pub fn build_cf_file(
             Err(_) => false,
         })
         .fold(0, |sum, _| sum + 1);
-
+    info!("Для сборки найдено {}", elems_num);
     let mut TOC: Vec<ElemAddr> = Vec::with_capacity(elems_num as usize);
     let mut cur_block_addr = FileHeader::SIZE + BlockHeader::SIZE;
     cur_block_addr += cmp::max(ElemAddr::SIZE * elems_num, V8_DEFAULT_PAGE_SIZE);
@@ -176,7 +176,7 @@ pub fn build_cf_file(
     TOC.extend(process_files(
         dirname,
         &mut file_out,
-        &mut cur_block_addr,
+        cur_block_addr,
         no_deflate,
     )?);
 
@@ -184,6 +184,7 @@ pub fn build_cf_file(
     file_out.seek(SeekFrom::Start(0))?;
     file_out.write_all(&file_header.into_bytes()?)?;
     let mut toc_bytes = vec![];
+    info!("TOC objects {}", TOC.len());
     for toc_elm in TOC.into_iter() {
         toc_bytes.extend(toc_elm.into_bytes()?);
     }
@@ -195,24 +196,27 @@ pub fn build_cf_file(
 fn process_files(
     dirname: &str,
     file_out: &mut fs::File,
-    cur_block_addr: &mut u32,
+    cur_block_addr: u32,
     no_deflate: bool,
 ) -> Result<Vec<ElemAddr>> {
     let mut result = vec![];
+    let mut cur_block_addr = cur_block_addr;
     for entry in fs::read_dir(dirname)? {
         let entry = entry?;
         if let Ok(name) = entry.file_name().into_string() {
+            info!("Обработка файла: {}", name);
             let header = vec![0; ElemHeaderBegin::SIZE as usize];
             let mut element = V8Elem::new().with_header(header);
             element.set_name(&name);
 
-            let elem_header_addr = *cur_block_addr;
+            let elem_header_addr = cur_block_addr;
             {
                 let elem_header = element.get_header();
-                save_block_data(file_out, elem_header, elem_header.len() as u32)?;
-                *cur_block_addr += elem_header.len() as u32;
+                let header_len = elem_header.len();
+                save_block_data(file_out, elem_header, header_len as u32)?;
+                cur_block_addr += header_len as u32;
             }
-            let elem_data_addr = *cur_block_addr;
+            let elem_data_addr = cur_block_addr;
 
             let elem_addr = ElemAddr::new(elem_data_addr, elem_header_addr);
             result.push(elem_addr);
@@ -225,9 +229,10 @@ fn process_files(
                         dirname,
                         &name,
                         no_deflate,
+                        &mut cur_block_addr,
                     )?;
                 } else {
-                    process_v8file(file_out, &mut element, dirname, &name, no_deflate)?;
+                    process_v8file(file_out, &mut element, dirname, &name, no_deflate, &mut cur_block_addr)?;
                 }
             } else {
                 error!("Couldn't get file type for {:?}", entry.path());
@@ -245,8 +250,10 @@ fn process_directory(
     dirname: &str,
     name: &str,
     no_deflate: bool,
+    cur_elem_addr: &mut u32,
 ) -> Result<()> {
     let new_dir = path::Path::new(dirname).join(name);
+    info!("Сохранение directory {}/{}", dirname, name);
     let mut v8 = V8File::new();
     v8.load_file_from_folder(new_dir)?;
     element.set_v8file(true);
@@ -254,6 +261,7 @@ fn process_directory(
     element.pack(!no_deflate)?;
 
     if let Some(data) = element.get_data() {
+        *cur_elem_addr += data.len() as u32;
         save_block_data(file_out, data, data.len() as u32)?;
     }
 
@@ -266,10 +274,12 @@ fn process_v8file(
     dirname: &str,
     name: &str,
     no_deflate: bool,
+    cur_block_addr: &mut u32,
 ) -> Result<()> {
     element.set_v8file(false);
     let mut data = vec![];
     let p_file = path::Path::new(dirname).join(name);
+    info!("Сохранение v8file {}/{}", dirname, name);
     let mut cur_file = fs::File::open(p_file)?;
     cur_file.read_to_end(&mut data)?;
 
@@ -277,6 +287,7 @@ fn process_v8file(
     element.pack(!no_deflate)?;
 
     if let Some(data) = element.get_data() {
+        *cur_block_addr += data.len() as u32;
         save_block_data(file_out, data, data.len() as u32)?;
     }
 

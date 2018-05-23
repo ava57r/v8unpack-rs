@@ -7,46 +7,30 @@
 {
     "type": "lldb",
     "request": "launch",
-    "name": "Cargo launch",
-    "cargo": {
+    "name": "Debug parse",
+    /*"cargo": {
         "args": [
             "run",
             "-p v8unpack",
             "--bin=v8unpack"
         ]
-    },
-    "program": "${cargo:program}",
-    "args": []
+    },*/
+    "program": "${workspaceFolder}/target/debug/v8unpack",
+    "args": ["--single-threaded", "--parse",  "/home/andreevlex/dev-pro/v8unpack-rs/tests/v7.cf", "/home/andreevlex/dev-pro/v8unpack-rs/tests/unpack2"]
 },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug v8unpack",
-            "cargo": {
-                "args": [
-                    "run",
-                    "-p v8unpack",
-                    "--bin=v8unpack"
-                ]
-            },
-            "args": [
-                ""
-            ],
-            "cwd": "${workspaceFolder}"
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug tests in v8unpack",
-            "cargo": {
-                "args": [
-                    "test",
-                    "--no-run",
-                    "--bin=v8unpack"
-                ]
-            },
-            "args": [],
-            "cwd": "${workspaceFolder}"
-        }
-    ]
+{
+    "type": "lldb",
+    "request": "launch",
+    "name": "Debug build",
+    /*"cargo": {
+        "args": [
+            "run",
+            "-p v8unpack",
+            "--bin=v8unpack"
+        ]
+    },*/
+    "program": "${workspaceFolder}/target/debug/v8unpack",
+    "args": ["--build", "/home/andreevlex/dev-pro/v8unpack-rs/tests/unpack1", "/home/andreevlex/dev-pro/v8unpack-rs/tests/v7.cf"]
+},
+   ]
 }

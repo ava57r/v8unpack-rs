@@ -115,7 +115,7 @@ fn start_file_reader_thread(
             let elem_block_header = BlockHeader::from_raw_parts(&mut buf_reader)?;
             if !elem_block_header.is_correct() {
                 return Err(error::V8Error::NotV8File {
-                    offset: cur_elem.elem_header_addr as u64,
+                    offset: 6, //cur_elem.elem_header_addr as u64,
                 });
             }
 
@@ -187,7 +187,7 @@ fn read_content(file_name: &str) -> Result<(FileHeader, Vec<ElemAddr>)> {
     if !buf_reader.is_v8file() {
         let cursor = Cursor::new(buf_reader);
         return Err(error::V8Error::NotV8File {
-            offset: cursor.position(),
+            offset:5, // cursor.position(),
         });
     }
 

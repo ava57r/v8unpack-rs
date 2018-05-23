@@ -29,7 +29,7 @@ pub fn unpack_to_directory_no_load(
     }
 
     let elems_addrs = read_elems_addrs(&mut buf_reader, &first_block_header)?;
-
+    println!("{:?}", elems_addrs);
     for cur_elem in elems_addrs.iter() {
         if cur_elem.fffffff != V8_MAGIC_NUMBER {
             break;
@@ -42,7 +42,7 @@ pub fn unpack_to_directory_no_load(
         if !elem_block_header.is_correct() {
             let cursor = Cursor::new(buf_reader);
             return Err(error::V8Error::NotV8File {
-                offset: cursor.position(),
+                offset: 1, //cursor.position(),
             });
         }
 
@@ -93,7 +93,7 @@ pub fn unpack_to_folder(file_name: &str, dir_name: &str) -> Result<bool> {
         if !elem_block_header.is_correct() {
             let cursor = Cursor::new(buf_reader);
             return Err(error::V8Error::NotV8File {
-                offset: cursor.position(),
+                offset: 2,//cursor.position(),
             });
         }
 
@@ -191,7 +191,7 @@ pub fn process_data(
     if !header.is_correct() {
         let cursor = Cursor::new(src);
         return Err(error::V8Error::NotV8File {
-            offset: cursor.position(),
+            offset: 3, //cursor.position(),
         });
     }
 
@@ -234,7 +234,7 @@ where
         if !elem_block_header.is_correct() {
             let cursor = Cursor::new(src);
             return Err(error::V8Error::NotV8File {
-                offset: cursor.position(),
+                offset: 4,//cursor.position(),
             });
         }
 

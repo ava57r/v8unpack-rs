@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate clap;
 extern crate v8unpack4rs;
+extern crate env_logger;
 
 use clap::{App, Arg};
 use v8unpack4rs::{builder, parser};
@@ -54,6 +55,8 @@ fn build(args: Vec<&str>, no_deflate: bool) -> bool {
 }
 
 fn main() {
+    ::std::env::set_var("RUST_LOG", "v8unpack4rs=info");
+    env_logger::init();
     let app_m = App::new("v8unpack")
         .version(crate_version!())
         .author(crate_authors!())
