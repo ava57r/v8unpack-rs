@@ -183,9 +183,11 @@ pub fn build_cf_file(
     let file_header = FileHeader::new(V8_MAGIC_NUMBER, V8_DEFAULT_PAGE_SIZE, 0);
     file_out.seek(SeekFrom::Start(0))?;
     file_out.write_all(&file_header.into_bytes()?)?;
+    let mut toc_bytes = vec![];
     for toc_elm in TOC.into_iter() {
-        file_out.write_all(&toc_elm.into_bytes()?)?;
+        toc_bytes.extend(toc_elm.into_bytes()?);
     }
+    save_block_data(&mut file_out, &toc_bytes, toc_bytes.len() as u32)?;
 
     Ok(true)
 }

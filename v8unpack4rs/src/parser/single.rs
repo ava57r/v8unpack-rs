@@ -40,7 +40,10 @@ pub fn unpack_to_directory_no_load(
         let elem_block_header = BlockHeader::from_raw_parts(&mut buf_reader)?;
 
         if !elem_block_header.is_correct() {
-            return Err(error::V8Error::NotV8File);
+            let cursor = Cursor::new(buf_reader);
+            return Err(error::V8Error::NotV8File {
+                offset: cursor.position(),
+            });
         }
 
         let elem_block_data = read_block_data(&mut buf_reader, &elem_block_header)?;
@@ -88,7 +91,10 @@ pub fn unpack_to_folder(file_name: &str, dir_name: &str) -> Result<bool> {
         let elem_block_header = BlockHeader::from_raw_parts(&mut buf_reader)?;
 
         if !elem_block_header.is_correct() {
-            return Err(error::V8Error::NotV8File);
+            let cursor = Cursor::new(buf_reader);
+            return Err(error::V8Error::NotV8File {
+                offset: cursor.position(),
+            });
         }
 
         let elem_block_data = read_block_data(&mut buf_reader, &elem_block_header)?;
@@ -183,7 +189,10 @@ pub fn process_data(
 ) -> Result<bool> {
     let header = BlockHeader::from_raw_parts(src)?;
     if !header.is_correct() {
-        return Err(error::V8Error::NotV8File);
+        let cursor = Cursor::new(src);
+        return Err(error::V8Error::NotV8File {
+            offset: cursor.position(),
+        });
     }
 
     let block_data = read_block_data(src, &header)?;
@@ -223,7 +232,10 @@ where
         let elem_block_header = BlockHeader::from_raw_parts(src)?;
 
         if !elem_block_header.is_correct() {
-            return Err(error::V8Error::NotV8File);
+            let cursor = Cursor::new(src);
+            return Err(error::V8Error::NotV8File {
+                offset: cursor.position(),
+            });
         }
 
         let elem_block_header_data = read_block_data(src, &elem_block_header)?;

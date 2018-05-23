@@ -2,7 +2,7 @@ use std::{fmt, io, num, str, string};
 
 #[derive(Debug)]
 pub enum V8Error {
-    NotV8File,
+    NotV8File { offset: u64 },
     IoError(io::Error),
     FromUtf8Error(string::FromUtf8Error),
     Utf8Error(str::Utf8Error),
@@ -37,7 +37,9 @@ impl fmt::Display for V8Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             V8Error::IoError(ref e) => fmt::Display::fmt(e, f),
-            V8Error::NotV8File => write!(f, "Not correct V8 file"),
+            V8Error::NotV8File { offset } => {
+                write!(f, "Not correct V8 file offset: {0}", offset)
+            }
             V8Error::FromUtf8Error(ref e) => fmt::Display::fmt(e, f),
             V8Error::Utf8Error(ref e) => fmt::Display::fmt(e, f),
             V8Error::ParseIntError(ref e) => fmt::Display::fmt(e, f),

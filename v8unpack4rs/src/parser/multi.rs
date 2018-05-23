@@ -114,7 +114,9 @@ fn start_file_reader_thread(
             buf_reader.seek(SeekFrom::Start(cur_elem.elem_header_addr as u64))?;
             let elem_block_header = BlockHeader::from_raw_parts(&mut buf_reader)?;
             if !elem_block_header.is_correct() {
-                return Err(error::V8Error::NotV8File);
+                return Err(error::V8Error::NotV8File {
+                    offset: cur_elem.elem_header_addr as u64,
+                });
             }
 
             let elem_block_data =
@@ -182,9 +184,11 @@ pub fn unpack_pipeline(file_name: &str, dir_name: &str) -> Result<bool> {
 fn read_content(file_name: &str) -> Result<(FileHeader, Vec<ElemAddr>)> {
     let file = fs::File::open(file_name)?;
     let mut buf_reader = BufReader::new(file);
-
     if !buf_reader.is_v8file() {
-        return Err(error::V8Error::NotV8File);
+        let cursor = Cursor::new(buf_reader);
+        return Err(error::V8Error::NotV8File {
+            offset: cursor.position(),
+        });
     }
 
     let file_header = buf_reader.get_file_header()?;

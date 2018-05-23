@@ -9,12 +9,18 @@ fn parse(args: Vec<&str>, single_threaded: bool) -> bool {
     if single_threaded {
         match parser::unpack_to_directory_no_load(&args[0], &args[1], true, true) {
             Ok(b) => b,
-            Err(e) => panic!(e.to_string()),
+            Err(e) => {
+                println!("{:?}", e);
+                panic!(e.to_string());
+            }
         }
     } else {
         match parser::parse_to_folder(&args[0], &args[1], true) {
             Ok(b) => b,
-            Err(e) => panic!(e.to_string()),
+            Err(e) => {
+                println!("{:?}", e);
+                panic!(e.to_string());
+            }
         }
     }
 }
