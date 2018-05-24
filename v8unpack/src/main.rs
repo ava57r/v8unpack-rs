@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate clap;
-extern crate v8unpack4rs;
 extern crate env_logger;
+extern crate v8unpack4rs;
 
 use clap::{App, Arg};
 use v8unpack4rs::{builder, parser};

@@ -4,33 +4,42 @@
     // Для получения дополнительной информации посетите: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-{
-    "type": "lldb",
-    "request": "launch",
-    "name": "Debug parse",
-    /*"cargo": {
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug parse",
+            /*"cargo": {
         "args": [
             "run",
             "-p v8unpack",
             "--bin=v8unpack"
         ]
     },*/
-    "program": "${workspaceFolder}/target/debug/v8unpack",
-    "args": ["--single-threaded", "--parse",  "/home/andreevlex/dev-pro/v8unpack-rs/tests/v7.cf", "/home/andreevlex/dev-pro/v8unpack-rs/tests/unpack2"]
-},
-{
-    "type": "lldb",
-    "request": "launch",
-    "name": "Debug build",
-    /*"cargo": {
+            "program": "${workspaceFolder}/target/debug/v8unpack",
+            "args": [
+                "--single-threaded",
+                "--parse",
+                "${workspaceFolder}/tests/price.epf",
+                "${workspaceFolder}/tests/unpack2"
+            ]
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug build",
+            /*"cargo": {
         "args": [
             "run",
             "-p v8unpack",
             "--bin=v8unpack"
         ]
     },*/
-    "program": "${workspaceFolder}/target/debug/v8unpack",
-    "args": ["--build", "/home/andreevlex/dev-pro/v8unpack-rs/tests/unpack1", "/home/andreevlex/dev-pro/v8unpack-rs/tests/v7.cf"]
-},
-   ]
+            "program": "${workspaceFolder}/target/debug/v8unpack",
+            "args": [
+                "--build",
+                "/home/andreevlex/dev-pro/v8unpack-rs/tests/unpack1",
+                "/home/andreevlex/dev-pro/v8unpack-rs/tests/v7.cf"
+            ]
+        },
+    ]
 }

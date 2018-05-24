@@ -123,7 +123,7 @@ fn save_block_data(
     file_out: &mut fs::File,
     block_data: &Vec<u8>,
     page_size: u32,
-) -> Result<()> {
+) -> Result<usize> {
     if block_data.len() > u32::MAX as usize {
         panic!("Invalid data length");
     }
@@ -135,14 +135,19 @@ fn save_block_data(
         page_size
     };
 
+    let mut write_bytes: usize = 0;
     let block_header = BlockHeader::new(block_size, page_size_actual, V8_MAGIC_NUMBER);
 
-    file_out.write_all(&block_header.into_bytes()?)?;
+    let bh_bytes = block_header.into_bytes()?;
+    file_out.write_all(&bh_bytes)?;
+    write_bytes += bh_bytes.len();
     file_out.write_all(&block_data)?;
+    write_bytes += block_data.len();
 
     write_terminal_zeros(file_out, page_size_actual - block_size)?;
+    write_bytes += (page_size_actual - block_size) as usize;
 
-    Ok(())
+    Ok(write_bytes)
 }
 
 fn write_terminal_zeros(file_out: &mut fs::File, count: u32) -> Result<()> {
@@ -212,9 +217,9 @@ fn process_files(
             let elem_header_addr = cur_block_addr;
             {
                 let elem_header = element.get_header();
-                let header_len = elem_header.len();
-                save_block_data(file_out, elem_header, header_len as u32)?;
-                cur_block_addr += header_len as u32;
+                cur_block_addr +=
+                    save_block_data(file_out, elem_header, elem_header.len() as u32)?
+                        as u32;
             }
             let elem_data_addr = cur_block_addr;
 
@@ -232,7 +237,14 @@ fn process_files(
                         &mut cur_block_addr,
                     )?;
                 } else {
-                    process_v8file(file_out, &mut element, dirname, &name, no_deflate, &mut cur_block_addr)?;
+                    process_v8file(
+                        file_out,
+                        &mut element,
+                        dirname,
+                        &name,
+                        no_deflate,
+                        &mut cur_block_addr,
+                    )?;
                 }
             } else {
                 error!("Couldn't get file type for {:?}", entry.path());
@@ -261,8 +273,7 @@ fn process_directory(
     element.pack(!no_deflate)?;
 
     if let Some(data) = element.get_data() {
-        *cur_elem_addr += data.len() as u32;
-        save_block_data(file_out, data, data.len() as u32)?;
+        *cur_elem_addr += save_block_data(file_out, data, data.len() as u32)? as u32;
     }
 
     Ok(())
@@ -287,8 +298,7 @@ fn process_v8file(
     element.pack(!no_deflate)?;
 
     if let Some(data) = element.get_data() {
-        *cur_block_addr += data.len() as u32;
-        save_block_data(file_out, data, data.len() as u32)?;
+        *cur_block_addr += save_block_data(file_out, data, data.len() as u32)? as u32;
     }
 
     Ok(())

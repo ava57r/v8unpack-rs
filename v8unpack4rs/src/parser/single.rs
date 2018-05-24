@@ -29,21 +29,18 @@ pub fn unpack_to_directory_no_load(
     }
 
     let elems_addrs = read_elems_addrs(&mut buf_reader, &first_block_header)?;
-    println!("{:?}", elems_addrs);
+
     for cur_elem in elems_addrs.iter() {
         if cur_elem.fffffff != V8_MAGIC_NUMBER {
             break;
         }
 
-        buf_reader.seek(SeekFrom::Start(cur_elem.elem_header_addr as u64))?;
+        let pos = buf_reader.seek(SeekFrom::Start(cur_elem.elem_header_addr as u64))?;
 
         let elem_block_header = BlockHeader::from_raw_parts(&mut buf_reader)?;
 
         if !elem_block_header.is_correct() {
-            let cursor = Cursor::new(buf_reader);
-            return Err(error::V8Error::NotV8File {
-                offset: 1, //cursor.position(),
-            });
+            return Err(error::V8Error::NotV8File { offset: pos });
         }
 
         let elem_block_data = read_block_data(&mut buf_reader, &elem_block_header)?;
@@ -86,15 +83,12 @@ pub fn unpack_to_folder(file_name: &str, dir_name: &str) -> Result<bool> {
             break;
         }
 
-        buf_reader.seek(SeekFrom::Start(cur_elem.elem_header_addr as u64))?;
+        let pos = buf_reader.seek(SeekFrom::Start(cur_elem.elem_header_addr as u64))?;
 
         let elem_block_header = BlockHeader::from_raw_parts(&mut buf_reader)?;
 
         if !elem_block_header.is_correct() {
-            let cursor = Cursor::new(buf_reader);
-            return Err(error::V8Error::NotV8File {
-                offset: 2,//cursor.position(),
-            });
+            return Err(error::V8Error::NotV8File { offset: pos });
         }
 
         let elem_block_data = read_block_data(&mut buf_reader, &elem_block_header)?;
@@ -189,9 +183,8 @@ pub fn process_data(
 ) -> Result<bool> {
     let header = BlockHeader::from_raw_parts(src)?;
     if !header.is_correct() {
-        let cursor = Cursor::new(src);
         return Err(error::V8Error::NotV8File {
-            offset: 3, //cursor.position(),
+            offset: src.seek(SeekFrom::Current(0))?,
         });
     }
 
@@ -227,15 +220,12 @@ where
             break;
         }
 
-        src.seek(SeekFrom::Start(cur_elem.elem_header_addr as u64))?;
+        let pos = src.seek(SeekFrom::Start(cur_elem.elem_header_addr as u64))?;
 
         let elem_block_header = BlockHeader::from_raw_parts(src)?;
 
         if !elem_block_header.is_correct() {
-            let cursor = Cursor::new(src);
-            return Err(error::V8Error::NotV8File {
-                offset: 4,//cursor.position(),
-            });
+            return Err(error::V8Error::NotV8File { offset: pos });
         }
 
         let elem_block_header_data = read_block_data(src, &elem_block_header)?;
