@@ -107,6 +107,7 @@ fn start_file_reader_thread(
         let mut buf_reader = BufReader::new(file);
 
         for cur_elem in elems_addrs.iter() {
+            debug!("{:?}", cur_elem);
             if cur_elem.fffffff != V8_MAGIC_NUMBER {
                 break;
             }

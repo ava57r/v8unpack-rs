@@ -171,7 +171,6 @@ pub fn build_cf_file(
             Err(_) => false,
         })
         .fold(0, |sum, _| sum + 1);
-    info!("Для сборки найдено {}", elems_num);
     let mut TOC: Vec<ElemAddr> = Vec::with_capacity(elems_num as usize);
     let mut cur_block_addr = FileHeader::SIZE + BlockHeader::SIZE;
     cur_block_addr += cmp::max(ElemAddr::SIZE * elems_num, V8_DEFAULT_PAGE_SIZE);
@@ -189,7 +188,6 @@ pub fn build_cf_file(
     file_out.seek(SeekFrom::Start(0))?;
     file_out.write_all(&file_header.into_bytes()?)?;
     let mut toc_bytes = vec![];
-    info!("TOC objects {}", TOC.len());
     for toc_elm in TOC.into_iter() {
         toc_bytes.extend(toc_elm.into_bytes()?);
     }
@@ -209,7 +207,6 @@ fn process_files(
     for entry in fs::read_dir(dirname)? {
         let entry = entry?;
         if let Ok(name) = entry.file_name().into_string() {
-            info!("Обработка файла: {}", name);
             let header = vec![0; ElemHeaderBegin::SIZE as usize];
             let mut element = V8Elem::new().with_header(header);
             element.set_name(&name);
@@ -265,7 +262,6 @@ fn process_directory(
     cur_elem_addr: &mut u32,
 ) -> Result<()> {
     let new_dir = path::Path::new(dirname).join(name);
-    info!("Сохранение directory {}/{}", dirname, name);
     let mut v8 = V8File::new();
     v8.load_file_from_folder(new_dir)?;
     element.set_v8file(true);
@@ -290,7 +286,6 @@ fn process_v8file(
     element.set_v8file(false);
     let mut data = vec![];
     let p_file = path::Path::new(dirname).join(name);
-    info!("Сохранение v8file {}/{}", dirname, name);
     let mut cur_file = fs::File::open(p_file)?;
     cur_file.read_to_end(&mut data)?;
 

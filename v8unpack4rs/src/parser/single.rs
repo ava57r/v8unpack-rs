@@ -31,6 +31,7 @@ pub fn unpack_to_directory_no_load(
     let elems_addrs = read_elems_addrs(&mut buf_reader, &first_block_header)?;
 
     for cur_elem in elems_addrs.iter() {
+        debug!("{:?}", cur_elem);
         if cur_elem.fffffff != V8_MAGIC_NUMBER {
             break;
         }
