@@ -1,6 +1,6 @@
 use container::*;
 use std::io::prelude::*;
-use std::io::{Read, SeekFrom, Write, Error as ioError, ErrorKind as ioErrorKind};
+use std::io::{Error as ioError, ErrorKind as ioErrorKind, Read, SeekFrom, Write};
 use std::{cmp, fs, path, ffi::OsStr, u32};
 
 #[derive(Debug)]

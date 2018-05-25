@@ -16,5 +16,8 @@ byteorder = "1.2.1"
 encoding = "0.2.33"
 log = "0.4"
 
+[dev-dependencies]
+tempdir = "0.3.7"
+
 [lib]
 crate_type = ["rlib", "cdylib"]
