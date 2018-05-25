@@ -19,7 +19,7 @@
             "args": [
                 "--single-threaded",
                 "--parse",
-                "${workspaceFolder}/tests/price.epf",
+                "${workspaceFolder}/tests/v5.cf",
                 "${workspaceFolder}/tests/unpack2"
             ]
         },
@@ -37,8 +37,8 @@
             "program": "${workspaceFolder}/target/debug/v8unpack",
             "args": [
                 "--build",
-                "/home/andreevlex/dev-pro/v8unpack-rs/tests/unpack1",
-                "/home/andreevlex/dev-pro/v8unpack-rs/tests/v7.cf"
+                "${workspaceFolder}/tests/unpack2",
+                "${workspaceFolder}/tests/v7.cf"
             ]
         },
     ]

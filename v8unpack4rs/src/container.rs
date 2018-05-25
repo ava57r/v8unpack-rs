@@ -721,7 +721,7 @@ impl V8File {
         page_size: u32,
     ) -> Result<()> {
         if block_data.len() > u32::MAX as usize {
-            panic!("Invalid data length");
+            ioError::new(ioErrorKind::InvalidData, "Invalid data length");
         }
 
         let block_size = block_data.len() as u32;

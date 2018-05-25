@@ -1,6 +1,6 @@
 use container::*;
 use std::io::prelude::*;
-use std::io::{Read, SeekFrom, Write};
+use std::io::{Read, SeekFrom, Write, Error as ioError, ErrorKind as ioErrorKind};
 use std::{cmp, fs, path, ffi::OsStr, u32};
 
 #[derive(Debug)]
@@ -80,14 +80,14 @@ fn save_elem_addrs(
     for pack_elem in pack_elems {
         let elem_header_addr = cur_elem_addr;
         if pack_elem.header_size > u32::MAX as u64 {
-            panic!("Invalid header length");
+            ioError::new(ioErrorKind::InvalidData, "Invalid header length");
         }
         cur_elem_addr += BlockHeader::SIZE + pack_elem.header_size as u32;
 
         let elem_data_addr = cur_elem_addr;
         cur_elem_addr += BlockHeader::SIZE;
         if pack_elem.data_size > u32::MAX as u64 {
-            panic!("Invalid data length");
+            ioError::new(ioErrorKind::InvalidData, "Invalid data length");
         }
         cur_elem_addr += cmp::max(pack_elem.data_size as u32, V8_DEFAULT_PAGE_SIZE);
 
@@ -125,7 +125,7 @@ fn save_block_data(
     page_size: u32,
 ) -> Result<usize> {
     if block_data.len() > u32::MAX as usize {
-        panic!("Invalid data length");
+        ioError::new(ioErrorKind::InvalidData, "Invalid data length");
     }
 
     let block_size = block_data.len() as u32;
@@ -171,13 +171,13 @@ pub fn build_cf_file(
             Err(_) => false,
         })
         .fold(0, |sum, _| sum + 1);
-    let mut TOC: Vec<ElemAddr> = Vec::with_capacity(elems_num as usize);
+    let mut toc: Vec<ElemAddr> = Vec::with_capacity(elems_num as usize);
     let mut cur_block_addr = FileHeader::SIZE + BlockHeader::SIZE;
     cur_block_addr += cmp::max(ElemAddr::SIZE * elems_num, V8_DEFAULT_PAGE_SIZE);
 
     let mut file_out = fs::File::create(filename_out)?;
     write_terminal_zeros(&mut file_out, cur_block_addr)?;
-    TOC.extend(process_files(
+    toc.extend(process_files(
         dirname,
         &mut file_out,
         cur_block_addr,
@@ -188,7 +188,7 @@ pub fn build_cf_file(
     file_out.seek(SeekFrom::Start(0))?;
     file_out.write_all(&file_header.into_bytes()?)?;
     let mut toc_bytes = vec![];
-    for toc_elm in TOC.into_iter() {
+    for toc_elm in toc.into_iter() {
         toc_bytes.extend(toc_elm.into_bytes()?);
     }
     save_block_data(&mut file_out, &toc_bytes, toc_bytes.len() as u32)?;
