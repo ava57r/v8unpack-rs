@@ -691,7 +691,7 @@ impl V8File {
         V8File::save_block_data_to_buffer(
             &mut result,
             &elem_addrs_bytes,
-            elem_addrs_bytes.len() as u32,
+            V8_DEFAULT_PAGE_SIZE,
         )?;
 
         for elem in new_elems.iter() {
@@ -705,7 +705,7 @@ impl V8File {
                 V8File::save_block_data_to_buffer(
                     &mut result,
                     data,
-                    V8_DEFAULT_PAGE_SIZE,
+                    cmp::max(data.len() as u32, V8_DEFAULT_PAGE_SIZE),
                 )?;
             } else {
                 error!("Empty!");

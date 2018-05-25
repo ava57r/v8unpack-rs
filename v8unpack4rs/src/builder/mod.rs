@@ -123,7 +123,7 @@ fn save_block_data(
     file_out: &mut fs::File,
     block_data: &Vec<u8>,
     page_size: u32,
-) -> Result<()> {
+) -> Result<usize> {
     if block_data.len() > u32::MAX as usize {
         panic!("Invalid data length");
     }
@@ -135,14 +135,19 @@ fn save_block_data(
         page_size
     };
 
+    let mut write_bytes: usize = 0;
     let block_header = BlockHeader::new(block_size, page_size_actual, V8_MAGIC_NUMBER);
 
-    file_out.write_all(&block_header.into_bytes()?)?;
+    let bh_bytes = block_header.into_bytes()?;
+    file_out.write_all(&bh_bytes)?;
+    write_bytes += bh_bytes.len();
     file_out.write_all(&block_data)?;
+    write_bytes += block_data.len();
 
     write_terminal_zeros(file_out, page_size_actual - block_size)?;
+    write_bytes += (page_size_actual - block_size) as usize;
 
-    Ok(())
+    Ok(write_bytes)
 }
 
 fn write_terminal_zeros(file_out: &mut fs::File, count: u32) -> Result<()> {
@@ -166,7 +171,6 @@ pub fn build_cf_file(
             Err(_) => false,
         })
         .fold(0, |sum, _| sum + 1);
-
     let mut TOC: Vec<ElemAddr> = Vec::with_capacity(elems_num as usize);
     let mut cur_block_addr = FileHeader::SIZE + BlockHeader::SIZE;
     cur_block_addr += cmp::max(ElemAddr::SIZE * elems_num, V8_DEFAULT_PAGE_SIZE);
@@ -176,7 +180,7 @@ pub fn build_cf_file(
     TOC.extend(process_files(
         dirname,
         &mut file_out,
-        &mut cur_block_addr,
+        cur_block_addr,
         no_deflate,
     )?);
 
@@ -195,10 +199,11 @@ pub fn build_cf_file(
 fn process_files(
     dirname: &str,
     file_out: &mut fs::File,
-    cur_block_addr: &mut u32,
+    cur_block_addr: u32,
     no_deflate: bool,
 ) -> Result<Vec<ElemAddr>> {
     let mut result = vec![];
+    let mut cur_block_addr = cur_block_addr;
     for entry in fs::read_dir(dirname)? {
         let entry = entry?;
         if let Ok(name) = entry.file_name().into_string() {
@@ -206,13 +211,14 @@ fn process_files(
             let mut element = V8Elem::new().with_header(header);
             element.set_name(&name);
 
-            let elem_header_addr = *cur_block_addr;
+            let elem_header_addr = cur_block_addr;
             {
                 let elem_header = element.get_header();
-                save_block_data(file_out, elem_header, elem_header.len() as u32)?;
-                *cur_block_addr += elem_header.len() as u32;
+                cur_block_addr +=
+                    save_block_data(file_out, elem_header, elem_header.len() as u32)?
+                        as u32;
             }
-            let elem_data_addr = *cur_block_addr;
+            let elem_data_addr = cur_block_addr;
 
             let elem_addr = ElemAddr::new(elem_data_addr, elem_header_addr);
             result.push(elem_addr);
@@ -225,9 +231,17 @@ fn process_files(
                         dirname,
                         &name,
                         no_deflate,
+                        &mut cur_block_addr,
                     )?;
                 } else {
-                    process_v8file(file_out, &mut element, dirname, &name, no_deflate)?;
+                    process_v8file(
+                        file_out,
+                        &mut element,
+                        dirname,
+                        &name,
+                        no_deflate,
+                        &mut cur_block_addr,
+                    )?;
                 }
             } else {
                 error!("Couldn't get file type for {:?}", entry.path());
@@ -245,6 +259,7 @@ fn process_directory(
     dirname: &str,
     name: &str,
     no_deflate: bool,
+    cur_elem_addr: &mut u32,
 ) -> Result<()> {
     let new_dir = path::Path::new(dirname).join(name);
     let mut v8 = V8File::new();
@@ -254,7 +269,7 @@ fn process_directory(
     element.pack(!no_deflate)?;
 
     if let Some(data) = element.get_data() {
-        save_block_data(file_out, data, data.len() as u32)?;
+        *cur_elem_addr += save_block_data(file_out, data, data.len() as u32)? as u32;
     }
 
     Ok(())
@@ -266,6 +281,7 @@ fn process_v8file(
     dirname: &str,
     name: &str,
     no_deflate: bool,
+    cur_block_addr: &mut u32,
 ) -> Result<()> {
     element.set_v8file(false);
     let mut data = vec![];
@@ -277,7 +293,7 @@ fn process_v8file(
     element.pack(!no_deflate)?;
 
     if let Some(data) = element.get_data() {
-        save_block_data(file_out, data, data.len() as u32)?;
+        *cur_block_addr += save_block_data(file_out, data, data.len() as u32)? as u32;
     }
 
     Ok(())

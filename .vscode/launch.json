@@ -4,49 +4,42 @@
     // Для получения дополнительной информации посетите: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-{
-    "type": "lldb",
-    "request": "launch",
-    "name": "Cargo launch",
-    "cargo": {
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug parse",
+            /*"cargo": {
         "args": [
             "run",
             "-p v8unpack",
             "--bin=v8unpack"
         ]
-    },
-    "program": "${cargo:program}",
-    "args": []
-},
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug v8unpack",
-            "cargo": {
-                "args": [
-                    "run",
-                    "-p v8unpack",
-                    "--bin=v8unpack"
-                ]
-            },
+    },*/
+            "program": "${workspaceFolder}/target/debug/v8unpack",
             "args": [
-                ""
-            ],
-            "cwd": "${workspaceFolder}"
+                "--single-threaded",
+                "--parse",
+                "${workspaceFolder}/tests/price.epf",
+                "${workspaceFolder}/tests/unpack2"
+            ]
         },
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug tests in v8unpack",
-            "cargo": {
-                "args": [
-                    "test",
-                    "--no-run",
-                    "--bin=v8unpack"
-                ]
-            },
-            "args": [],
-            "cwd": "${workspaceFolder}"
-        }
+            "name": "Debug build",
+            /*"cargo": {
+        "args": [
+            "run",
+            "-p v8unpack",
+            "--bin=v8unpack"
+        ]
+    },*/
+            "program": "${workspaceFolder}/target/debug/v8unpack",
+            "args": [
+                "--build",
+                "/home/andreevlex/dev-pro/v8unpack-rs/tests/unpack1",
+                "/home/andreevlex/dev-pro/v8unpack-rs/tests/v7.cf"
+            ]
+        },
     ]
 }

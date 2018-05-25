@@ -11,4 +11,5 @@ license = "MIT"
 
 [dependencies]
 clap = "2.28.0"
+env_logger = "0.5"
 v8unpack4rs = { path = "../v8unpack4rs" }
