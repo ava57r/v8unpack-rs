@@ -53,7 +53,9 @@ fn start_file_parse(
     bool_inflate: bool,
 ) -> Result<bool> {
     for v8_elem in v8_elems {
-        let elem_path = p_dir.join(&v8_elem.get_name()?);
+        let name = v8_elem.get_name()?;
+        info!("parse element {}", name);
+        let elem_path = p_dir.join(name);
 
         if let Some(out_data) = v8_elem.get_data() {
             let mut rdr = Cursor::new(&out_data);
@@ -80,6 +82,7 @@ pub fn parse_to_folder(
         fs::create_dir(dir_name)?;
     };
 
+    info!("the beginning of the file parsing {}", file_name);
     let (_, elems_addrs) = read_content(file_name)?;
     let (v8_elems, h1) =
         start_file_reader_thread(path::PathBuf::from(file_name), elems_addrs);
@@ -116,6 +119,7 @@ fn start_file_reader_thread(
                 buf_reader.seek(SeekFrom::Start(cur_elem.elem_header_addr as u64))?;
             let elem_block_header = BlockHeader::from_raw_parts(&mut buf_reader)?;
             if !elem_block_header.is_correct() {
+                error!("the file is not in the correct format");
                 return Err(error::V8Error::NotV8File { offset: pos });
             }
 
@@ -148,10 +152,12 @@ fn start_file_write(v8_elems: Receiver<V8Elem>, p_dir: &path::Path) -> Result<bo
         let elem_name = v8_elem.get_name()?;
 
         let file_elem_header = format!("{0}.{1}", elem_name, "header");
+        info!("write to file {}", file_elem_header);
         fs::File::create(p_dir.join(&file_elem_header))?
             .write_all(&v8_elem.get_header())?;
 
         let file_elem_data = format!("{0}.{1}", elem_name, "data");
+        info!("write to file {}", file_elem_header);
         if let Some(block_data) = v8_elem.get_data() {
             fs::File::create(p_dir.join(&file_elem_data))?.write_all(block_data)?;
         }
@@ -185,6 +191,7 @@ fn read_content(file_name: &str) -> Result<(FileHeader, Vec<ElemAddr>)> {
     let file = fs::File::open(file_name)?;
     let mut buf_reader = BufReader::new(file);
     if !buf_reader.is_v8file() {
+        error!("the file is not in the correct format");
         return Err(error::V8Error::NotV8File {
             offset: buf_reader.seek(SeekFrom::Current(0))?,
         });

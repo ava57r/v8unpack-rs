@@ -1,10 +1,50 @@
 #[macro_use]
+extern crate log;
+#[macro_use]
 extern crate clap;
-extern crate env_logger;
+extern crate chrono;
+extern crate fern;
+
 extern crate v8unpack4rs;
 
 use clap::{App, Arg};
+use std::io;
 use v8unpack4rs::{builder, parser};
+
+fn setup_logging(log_level: Option<&str>) -> Result<(), fern::InitError> {
+    let mut basic_config = fern::Dispatch::new();
+
+    let level = match log_level {
+        None => log::LevelFilter::Info,
+        Some(v) => match v {
+            "info" => log::LevelFilter::Info,
+            "debug" => log::LevelFilter::Debug,
+            "warn" => log::LevelFilter::Warn,
+            "trace" => log::LevelFilter::Trace,
+            "error" => log::LevelFilter::Error,
+            _ => panic!(
+                "Bad value of the logging level. True variants: debug, info, \
+                 trace, warn, error."
+            ),
+        },
+    };
+
+    let stdout_config = fern::Dispatch::new()
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "[{}][{}][{}] {}",
+                chrono::Local::now().format("%H:%M:%S"),
+                record.target(),
+                record.level(),
+                message
+            ))
+        })
+        .chain(io::stdout());
+
+    basic_config.chain(stdout_config).apply()?;
+
+    Ok(())
+}
 
 fn parse(args: Vec<&str>, single_threaded: bool) -> bool {
     if single_threaded {
@@ -55,8 +95,6 @@ fn build(args: Vec<&str>, no_deflate: bool) -> bool {
 }
 
 fn main() {
-    ::std::env::set_var("RUST_LOG", "v8unpack4rs=info");
-    env_logger::init();
     let app_m = App::new("v8unpack")
         .version(crate_version!())
         .author(crate_authors!())
@@ -108,10 +146,23 @@ fn main() {
                 .long("no-deflate")
                 .help("Not deflate"),
         )
+        .arg(
+            Arg::with_name("verbosity")
+                .short("v")
+                .long("verbosity")
+                .help("Logging verbosity level")
+                .takes_value(true)
+                .value_name("LOG_LEVEL"),
+        )
         .get_matches();
 
     let single_threaded = app_m.is_present("single-threaded");
     let no_deflate = app_m.is_present("no-deflate");
+
+    if app_m.is_present("verbosity") {
+        setup_logging(app_m.value_of("verbosity"))
+            .expect("failed to initialize logging.");
+    }
 
     if let Some(vals) = app_m.values_of("parse") {
         let v: Vec<&str> = vals.collect();

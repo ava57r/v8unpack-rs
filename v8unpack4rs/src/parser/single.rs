@@ -5,8 +5,6 @@ use std::io::prelude::*;
 use std::io::{BufReader, Cursor, Error as ioError, ErrorKind as ioErrorKind, SeekFrom};
 use std::{cmp, fs, path, str};
 
-use inflate;
-
 /// Makes the unpacking of the container to a directory on disk.
 pub fn unpack_to_directory_no_load(
     file_name: &str,
@@ -14,6 +12,7 @@ pub fn unpack_to_directory_no_load(
     bool_inflate: bool,
     _unpack_when_need: bool,
 ) -> Result<bool> {
+    info!("the beginning of the file parsing {}", file_name);
     let file = fs::File::open(file_name)?;
     let mut buf_reader = BufReader::new(file);
 
@@ -41,6 +40,7 @@ pub fn unpack_to_directory_no_load(
         let elem_block_header = BlockHeader::from_raw_parts(&mut buf_reader)?;
 
         if !elem_block_header.is_correct() {
+            error!("the file is not in the correct format");
             return Err(error::V8Error::NotV8File { offset: pos });
         }
 
@@ -54,12 +54,15 @@ pub fn unpack_to_directory_no_load(
             let _result = process_data(&mut buf_reader, bool_inflate, &elem_path)?;
         }
     }
+
+    info!("parsing file {} completed successfully", file_name);
     Ok(true)
 }
 
 /// Parses the container into its component parts so that the elements
 /// are saved in binary format in a directory on disk.
 pub fn unpack_to_folder(file_name: &str, dir_name: &str) -> Result<bool> {
+    info!("start of file unpacking {}", file_name);
     let file = fs::File::open(file_name)?;
     let mut buf_reader = BufReader::new(file);
 
@@ -80,6 +83,7 @@ pub fn unpack_to_folder(file_name: &str, dir_name: &str) -> Result<bool> {
     let elems_addrs = read_elems_addrs(&mut buf_reader, &first_block_header)?;
 
     for cur_elem in elems_addrs.iter() {
+        debug!("{:?}", cur_elem);
         if cur_elem.fffffff != V8_MAGIC_NUMBER {
             break;
         }
@@ -89,6 +93,7 @@ pub fn unpack_to_folder(file_name: &str, dir_name: &str) -> Result<bool> {
         let elem_block_header = BlockHeader::from_raw_parts(&mut buf_reader)?;
 
         if !elem_block_header.is_correct() {
+            error!("the file is not in the correct format");
             return Err(error::V8Error::NotV8File { offset: pos });
         }
 
@@ -114,6 +119,11 @@ pub fn unpack_to_folder(file_name: &str, dir_name: &str) -> Result<bool> {
             fs::File::create(p_dir.join(&file_elem_data))?.write_all(&block_data)?;
         }
     }
+
+    info!(
+        "unpacking the file {} has completed successfully",
+        file_name
+    );
     Ok(true)
 }
 
@@ -124,6 +134,7 @@ pub fn read_elems_addrs<R>(
 where
     R: Read + Seek,
 {
+    info!("read the file table of contents");
     let block_data = read_block_data(src, block_header)?;
     let data_size = block_data.len() as u64;
     let mut rdr = Cursor::new(block_data);
@@ -134,6 +145,7 @@ where
         elems_addrs.push(ElemAddr::from_raw_parts(&mut rdr)?);
     }
 
+    info!("read {} table of contents items", elems_addrs.len());
     Ok(elems_addrs)
 }
 
@@ -142,7 +154,7 @@ where
     R: Read + Seek,
 {
     let data_size = block_header.get_data_size()?;
-
+    info!("start reading a block of data from a file");
     let mut result: Vec<u8> = Vec::with_capacity(data_size as usize);
 
     let mut read_in_bytes = 0;
@@ -153,8 +165,8 @@ where
         let next_page_addr = local_block_header.get_next_page_addr()?;
 
         let bytes_to_read = cmp::min(page_size, data_size - read_in_bytes);
-        let mut lbuf: Vec<u8> = Vec::with_capacity(bytes_to_read as usize);
-        let read_b = src.take(bytes_to_read as u64).read_to_end(&mut lbuf)?;
+        let mut buf: Vec<u8> = Vec::with_capacity(bytes_to_read as usize);
+        let read_b = src.take(bytes_to_read as u64).read_to_end(&mut buf)?;
 
         read_in_bytes += bytes_to_read;
         if read_b < bytes_to_read as usize {
@@ -164,7 +176,7 @@ where
             )));
         }
 
-        result.extend(lbuf.iter());
+        result.extend(buf.iter());
 
         if next_page_addr != V8_MAGIC_NUMBER {
             src.seek(SeekFrom::Start(next_page_addr as u64))?;
@@ -174,6 +186,7 @@ where
         }
     }
 
+    info!("{} bytes read", result.len());
     Ok(result)
 }
 
@@ -184,16 +197,14 @@ pub fn process_data(
 ) -> Result<bool> {
     let header = BlockHeader::from_raw_parts(src)?;
     if !header.is_correct() {
+        error!("the file is not in the correct format");
         return Err(error::V8Error::NotV8File {
             offset: src.seek(SeekFrom::Current(0))?,
         });
     }
 
     let block_data = read_block_data(src, &header)?;
-    let out_data = match inflate::inflate_bytes(&block_data) {
-        Ok(inf_bytes) => inf_bytes,
-        Err(_) => block_data,
-    };
+    let out_data = try_inflate_bytes(block_data);
 
     let mut rdr = Cursor::new(&out_data);
 
@@ -210,6 +221,7 @@ pub fn load_file<R>(src: &mut R, bool_inflate: bool) -> Result<V8File>
 where
     R: Read + Seek + V8Container,
 {
+    info!("read data from a V8 File format file");
     let file_header = src.get_file_header()?;
     let first_block_header = src.get_first_block_header()?;
 
@@ -217,6 +229,7 @@ where
     let mut elems: Vec<V8Elem> = vec![];
 
     for cur_elem in elems_addrs.iter() {
+        debug!("{:?}", cur_elem);
         if cur_elem.fffffff != V8_MAGIC_NUMBER {
             break;
         }
@@ -226,6 +239,7 @@ where
         let elem_block_header = BlockHeader::from_raw_parts(src)?;
 
         if !elem_block_header.is_correct() {
+            error!("the file is not in the correct format");
             return Err(error::V8Error::NotV8File { offset: pos });
         }
 
@@ -240,10 +254,7 @@ where
             vec![]
         };
 
-        let out_data = match inflate::inflate_bytes(&elem_block_data) {
-            Ok(inf_bytes) => inf_bytes,
-            Err(_) => elem_block_data,
-        };
+        let out_data = try_inflate_bytes(elem_block_data);
 
         let mut rdr = Cursor::new(out_data);
         let is_v8file = rdr.is_v8file();
@@ -269,4 +280,13 @@ where
         .with_header(file_header)
         .with_elems_addrs(elems_addrs)
         .with_elems(elems))
+}
+
+pub fn try_inflate_bytes(input: Vec<u8>) -> Vec<u8> {
+    use inflate;
+
+    match inflate::inflate_bytes(&input) {
+        Ok(inf_bytes) => inf_bytes,
+        Err(_) => input,
+    }
 }

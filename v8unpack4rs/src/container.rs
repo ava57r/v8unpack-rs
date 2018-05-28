@@ -570,7 +570,7 @@ impl V8File {
 
         for elem in self.elems.iter() {
             let name_elem = elem.get_name()?;
-
+            info!("parse element {}", name_elem);
             let out_path = elem_path.join(name_elem);
 
             if !elem.is_v8file {
