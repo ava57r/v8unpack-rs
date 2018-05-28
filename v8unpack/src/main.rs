@@ -29,6 +29,8 @@ fn setup_logging(log_level: Option<&str>) -> Result<(), fern::InitError> {
         },
     };
 
+    basic_config = basic_config.level(level);
+
     let stdout_config = fern::Dispatch::new()
         .format(|out, message, record| {
             out.finish(format_args!(
