@@ -14,4 +14,4 @@ clap = "2.28.0"
 fern = "0.5.5"
 log = "0.4.1"
 chrono = "0.4.2"
-v8unpack4rs = { path = "../v8unpack4rs" }
+v8unpack4rs = "0.2.1"
