@@ -48,51 +48,39 @@ fn setup_logging(log_level: Option<&str>) -> Result<(), fern::InitError> {
     Ok(())
 }
 
-fn parse(args: Vec<&str>, single_threaded: bool) -> bool {
-    if single_threaded {
-        match parser::unpack_to_directory_no_load(&args[0], &args[1], true, true) {
-            Ok(b) => b,
-            Err(e) => {
-                println!("{:?}", e);
-                panic!(e.to_string());
-            }
-        }
-    } else {
-        match parser::parse_to_folder(&args[0], &args[1], true) {
-            Ok(b) => b,
-            Err(e) => {
-                println!("{:?}", e);
-                panic!(e.to_string());
-            }
+fn parse(app_m: &clap::ArgMatches, single_threaded: bool) {
+    if let Some(v) = app_m.values_of("parse") {
+        let args: Vec<&str> = v.collect();
+        if single_threaded {
+            parser::unpack_to_directory_no_load(&args[0], &args[1], true, true).unwrap();
+        } else {
+            parser::parse_to_folder(&args[0], &args[1], true).unwrap();
         }
     }
 }
 
-fn unpack(args: Vec<&str>, single_threaded: bool) -> bool {
-    if single_threaded {
-        match parser::unpack_to_folder(&args[0], &args[1]) {
-            Ok(b) => b,
-            Err(e) => panic!(e.to_string()),
-        }
-    } else {
-        match parser::unpack_pipeline(&args[0], &args[1]) {
-            Ok(b) => b,
-            Err(e) => panic!(e.to_string()),
+fn unpack(app_m: &clap::ArgMatches, single_threaded: bool) {
+    if let Some(v) = app_m.values_of("unpack") {
+        let args: Vec<&str> = v.collect();
+        if single_threaded {
+            parser::unpack_to_folder(&args[0], &args[1]).unwrap();
+        } else {
+            parser::unpack_pipeline(&args[0], &args[1]).unwrap();
         }
     }
 }
 
-fn pack(args: Vec<&str>, _single_threaded: bool) -> bool {
-    match builder::pack_from_folder(&args[0], &args[1]) {
-        Ok(b) => b,
-        Err(e) => panic!(e.to_string()),
+fn pack(app_m: &clap::ArgMatches, _single_threaded: bool) {
+    if let Some(v) = app_m.values_of("pack") {
+        let args: Vec<&str> = v.collect();
+        builder::pack_from_folder(&args[0], &args[1]).unwrap();
     }
 }
 
-fn build(args: Vec<&str>, no_deflate: bool) -> bool {
-    match builder::build_cf_file(&args[0], &args[1], no_deflate) {
-        Ok(b) => b,
-        Err(e) => panic!(e.to_string()),
+fn build(app_m: &clap::ArgMatches, no_deflate: bool) {
+    if let Some(v) = app_m.values_of("build") {
+        let args: Vec<&str> = v.collect();
+        builder::build_cf_file(&args[0], &args[1], no_deflate).unwrap();
     }
 }
 
@@ -143,10 +131,10 @@ fn main() {
                 .value_names(&["INPUTFILE", "OUTDIR"]),
         )
         .arg(
-            Arg::with_name("no-deflate")
-                .short("n")
-                .long("no-deflate")
-                .help("Not deflate"),
+            Arg::with_name("nopack")
+                .help("Not deflate")
+                .requires("build")
+                .index(1),
         )
         .arg(
             Arg::with_name("verbosity")
@@ -166,31 +154,11 @@ fn main() {
             .expect("failed to initialize logging.");
     }
 
-    if let Some(vals) = app_m.values_of("parse") {
-        let v: Vec<&str> = vals.collect();
-        if parse(v, single_threaded) {
-            std::process::exit(0);
-        }
-    }
+    parse(&app_m, single_threaded);
 
-    if let Some(vals) = app_m.values_of("unpack") {
-        let v: Vec<&str> = vals.collect();
-        if unpack(v, single_threaded) {
-            std::process::exit(0);
-        }
-    }
+    unpack(&app_m, single_threaded);
 
-    if let Some(vals) = app_m.values_of("pack") {
-        let v: Vec<&str> = vals.collect();
-        if pack(v, true) {
-            std::process::exit(0);
-        }
-    }
+    pack(&app_m, single_threaded);
 
-    if let Some(vals) = app_m.values_of("build") {
-        let v: Vec<&str> = vals.collect();
-        if build(v, no_deflate) {
-            std::process::exit(0);
-        }
-    }
+    build(&app_m, no_deflate);
 }
