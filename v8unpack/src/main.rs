@@ -1,8 +1,3 @@
-extern crate chrono;
-extern crate clap;
-extern crate fern;
-extern crate log;
-
 extern crate v8unpack4rs;
 
 use clap::{crate_authors, crate_version, App, Arg};

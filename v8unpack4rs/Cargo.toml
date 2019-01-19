@@ -8,6 +8,7 @@ repository = "https://github.com/andreevlex/v8unpack-rs"
 keywords = ["parser", "binary", "1cd"]
 readme = "README.md"
 license = "MIT"
+edition = "2018"
 
 [dependencies]
 deflate = "0.7.19"

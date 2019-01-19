@@ -9,8 +9,9 @@ use encoding::all::UTF_16LE;
 use encoding::{EncoderTrap, Encoding};
 
 use deflate;
+use log::*;
 
-use error;
+use crate::error;
 
 pub type Result<T> = result::Result<T, error::V8Error>;
 

@@ -1,6 +1,7 @@
-use container::*;
-use error;
+use crate::container::*;
+use crate::error;
 
+use log::*;
 use std::io::prelude::*;
 use std::io::{BufReader, Cursor, Error as ioError, ErrorKind as ioErrorKind, SeekFrom};
 use std::{cmp, fs, path, str};

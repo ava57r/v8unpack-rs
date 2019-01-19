@@ -1,5 +1,5 @@
-use container::*;
-use error;
+use crate::container::*;
+use crate::error;
 
 use std::io::prelude::*;
 use std::io::{BufReader, Cursor, SeekFrom};
@@ -9,6 +9,7 @@ use std::{fs, path, str};
 
 use super::single;
 use inflate;
+use log::*;
 
 fn start_inflate_thread(
     v8_elems: Receiver<V8Elem>,
