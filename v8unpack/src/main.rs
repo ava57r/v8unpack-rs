@@ -1,13 +1,6 @@
-#[macro_use]
-extern crate log;
-#[macro_use]
-extern crate clap;
-extern crate chrono;
-extern crate fern;
-
 extern crate v8unpack4rs;
 
-use clap::{App, Arg};
+use clap::{crate_authors, crate_version, App, Arg};
 use std::io;
 use v8unpack4rs::{builder, parser};
 

@@ -1,6 +1,7 @@
-use container::*;
-use error;
+use crate::container::*;
+use crate::error;
 
+use log::*;
 use std::io::prelude::*;
 use std::io::{BufReader, Cursor, Error as ioError, ErrorKind as ioErrorKind, SeekFrom};
 use std::{cmp, fs, path, str};
@@ -35,7 +36,8 @@ pub fn unpack_to_directory_no_load(
             break;
         }
 
-        let pos = buf_reader.seek(SeekFrom::Start(cur_elem.elem_header_addr as u64))?;
+        let pos =
+            buf_reader.seek(SeekFrom::Start(u64::from(cur_elem.elem_header_addr)))?;
 
         let elem_block_header = BlockHeader::from_raw_parts(&mut buf_reader)?;
 
@@ -50,7 +52,7 @@ pub fn unpack_to_directory_no_load(
         let elem_path = p_dir.join(&elem_name);
 
         if cur_elem.elem_data_addr != V8_MAGIC_NUMBER {
-            buf_reader.seek(SeekFrom::Start(cur_elem.elem_data_addr as u64))?;
+            buf_reader.seek(SeekFrom::Start(u64::from(cur_elem.elem_data_addr)))?;
             let _result = process_data(&mut buf_reader, bool_inflate, &elem_path)?;
         }
     }
@@ -88,7 +90,8 @@ pub fn unpack_to_folder(file_name: &str, dir_name: &str) -> Result<bool> {
             break;
         }
 
-        let pos = buf_reader.seek(SeekFrom::Start(cur_elem.elem_header_addr as u64))?;
+        let pos =
+            buf_reader.seek(SeekFrom::Start(u64::from(cur_elem.elem_header_addr)))?;
 
         let elem_block_header = BlockHeader::from_raw_parts(&mut buf_reader)?;
 
@@ -109,7 +112,7 @@ pub fn unpack_to_folder(file_name: &str, dir_name: &str) -> Result<bool> {
             .write_all(&v8_elem.get_header())?;
 
         if cur_elem.elem_data_addr != V8_MAGIC_NUMBER {
-            buf_reader.seek(SeekFrom::Start(cur_elem.elem_data_addr as u64))?;
+            buf_reader.seek(SeekFrom::Start(u64::from(cur_elem.elem_data_addr)))?;
             let block_header_data = BlockHeader::from_raw_parts(&mut buf_reader)?;
 
             let block_data = read_block_data(&mut buf_reader, &block_header_data)?;
@@ -166,7 +169,7 @@ where
 
         let bytes_to_read = cmp::min(page_size, data_size - read_in_bytes);
         let mut buf: Vec<u8> = Vec::with_capacity(bytes_to_read as usize);
-        let read_b = src.take(bytes_to_read as u64).read_to_end(&mut buf)?;
+        let read_b = src.take(u64::from(bytes_to_read)).read_to_end(&mut buf)?;
 
         read_in_bytes += bytes_to_read;
         if read_b < bytes_to_read as usize {
@@ -179,7 +182,7 @@ where
         result.extend(buf.iter());
 
         if next_page_addr != V8_MAGIC_NUMBER {
-            src.seek(SeekFrom::Start(next_page_addr as u64))?;
+            src.seek(SeekFrom::Start(u64::from(next_page_addr)))?;
             local_block_header = BlockHeader::from_raw_parts(src)?;
         } else {
             break;
@@ -234,7 +237,7 @@ where
             break;
         }
 
-        let pos = src.seek(SeekFrom::Start(cur_elem.elem_header_addr as u64))?;
+        let pos = src.seek(SeekFrom::Start(u64::from(cur_elem.elem_header_addr)))?;
 
         let elem_block_header = BlockHeader::from_raw_parts(src)?;
 
@@ -246,7 +249,7 @@ where
         let elem_block_header_data = read_block_data(src, &elem_block_header)?;
 
         let elem_block_data: Vec<u8> = if cur_elem.elem_data_addr != V8_MAGIC_NUMBER {
-            src.seek(SeekFrom::Start(cur_elem.elem_data_addr as u64))?;
+            src.seek(SeekFrom::Start(u64::from(cur_elem.elem_data_addr)))?;
             let block_header_data = BlockHeader::from_raw_parts(src)?;
 
             read_block_data(src, &block_header_data)?

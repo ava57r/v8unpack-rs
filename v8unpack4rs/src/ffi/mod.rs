@@ -3,7 +3,7 @@ use std::os::raw::c_char;
 use std::panic::catch_unwind;
 use std::str::Utf8Error;
 
-use parser::unpack_to_directory_no_load;
+use crate::parser::unpack_to_directory_no_load;
 
 unsafe fn get_string(ptr: *const c_char) -> Result<String, Utf8Error> {
     Ok(CStr::from_ptr(ptr).to_str()?.to_owned())
@@ -20,7 +20,7 @@ pub unsafe extern "C" fn parse_cf(
         let file_name = get_string(pfile_name).unwrap();
         let dir_name = get_string(pdir_name).unwrap();
 
-        return unpack_to_directory_no_load(&file_name, &dir_name, true, true).unwrap();
+        unpack_to_directory_no_load(&file_name, &dir_name, true, true).unwrap()
     });
 
     if result.is_err() {
@@ -28,5 +28,5 @@ pub unsafe extern "C" fn parse_cf(
         return false;
     }
 
-    return true;
+    true
 }

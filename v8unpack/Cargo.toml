@@ -8,10 +8,11 @@ repository = "https://github.com/andreevlex/v8unpack-rs"
 keywords = ["parser", "binary", "1cd"]
 readme = "README.md"
 license = "MIT"
+edition = "2018"
 
 [dependencies]
-clap = "2.28.0"
-fern = "0.5.5"
-log = "0.4.1"
-chrono = "0.4.2"
-v8unpack4rs = "0.2.1"
+clap = "2.32.0"
+fern = "0.5.7"
+log = "0.4.6"
+chrono = "0.4.6"
+v8unpack4rs = {path = "../v8unpack4rs" }

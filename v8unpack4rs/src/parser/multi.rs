@@ -1,5 +1,5 @@
-use container::*;
-use error;
+use crate::container::*;
+use crate::error;
 
 use std::io::prelude::*;
 use std::io::{BufReader, Cursor, SeekFrom};
@@ -9,6 +9,7 @@ use std::{fs, path, str};
 
 use super::single;
 use inflate;
+use log::*;
 
 fn start_inflate_thread(
     v8_elems: Receiver<V8Elem>,
@@ -33,7 +34,7 @@ fn start_inflate_thread(
                 }
             }
 
-            if inf_bytes_tuple.1 == true {
+            if inf_bytes_tuple.1 {
                 out_element = out_element.with_data(inf_bytes_tuple.0);
             }
 
@@ -115,8 +116,8 @@ fn start_file_reader_thread(
                 break;
             }
 
-            let pos =
-                buf_reader.seek(SeekFrom::Start(cur_elem.elem_header_addr as u64))?;
+            let pos = buf_reader
+                .seek(SeekFrom::Start(u64::from(cur_elem.elem_header_addr)))?;
             let elem_block_header = BlockHeader::from_raw_parts(&mut buf_reader)?;
             if !elem_block_header.is_correct() {
                 error!("the file is not in the correct format");
@@ -128,7 +129,7 @@ fn start_file_reader_thread(
             let mut v8_elem = V8Elem::new().with_header(elem_block_data);
 
             if cur_elem.elem_data_addr != V8_MAGIC_NUMBER {
-                buf_reader.seek(SeekFrom::Start(cur_elem.elem_data_addr as u64))?;
+                buf_reader.seek(SeekFrom::Start(u64::from(cur_elem.elem_data_addr)))?;
                 let block_header_data = BlockHeader::from_raw_parts(&mut buf_reader)?;
 
                 v8_elem = v8_elem.with_data(single::read_block_data(
