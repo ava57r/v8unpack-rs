@@ -1,7 +1,7 @@
 [package]
 name = "v8unpack"
 description = "Unpack, pack, deflate and inflate 1C v8 file (*.cf)"
-version = "0.2.1"
+version = "0.3.0"
 authors = ["Andreev Alexander <andreevlex.as@gmail.com>"]
 homepage = "https://github.com/andreevlex/v8unpack-rs"
 repository = "https://github.com/andreevlex/v8unpack-rs"
@@ -15,4 +15,4 @@ clap = "2.32.0"
 fern = "0.5.7"
 log = "0.4.6"
 chrono = "0.4.6"
-v8unpack4rs = {path = "../v8unpack4rs" }
+v8unpack4rs = "0.3.0"
