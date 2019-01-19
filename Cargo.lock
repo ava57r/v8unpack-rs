@@ -268,12 +268,12 @@ dependencies = [
  "clap 2.32.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "fern 0.5.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "v8unpack4rs 0.2.1",
+ "v8unpack4rs 0.3.0",
 ]
 
 [[package]]
 name = "v8unpack4rs"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "byteorder 1.2.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "deflate 0.7.19 (registry+https://github.com/rust-lang/crates.io-index)",
