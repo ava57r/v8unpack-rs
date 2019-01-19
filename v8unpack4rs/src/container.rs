@@ -277,9 +277,13 @@ impl BlockHeader {
 
     /// Checks that the block header for correctness.
     pub fn is_correct(&self) -> bool {
-        self.eol_0d == b'\r' && self.eol_0a == b'\n' && self.space1 == b'\x20'
-            && self.space2 == b'\x20' && self.space3 == b'\x20'
-            && self.eol2_0d == b'\r' && self.eol2_0a == b'\n'
+        self.eol_0d == b'\r'
+            && self.eol_0a == b'\n'
+            && self.space1 == b'\x20'
+            && self.space2 == b'\x20'
+            && self.space3 == b'\x20'
+            && self.eol2_0d == b'\r'
+            && self.eol2_0a == b'\n'
     }
 
     /// Gets the value of the size of the data section from hexadecimal

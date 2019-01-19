@@ -1,11 +1,11 @@
-extern crate log;
-extern crate clap;
 extern crate chrono;
+extern crate clap;
 extern crate fern;
+extern crate log;
 
 extern crate v8unpack4rs;
 
-use clap::{App, Arg, crate_authors, crate_version};
+use clap::{crate_authors, crate_version, App, Arg};
 use std::io;
 use v8unpack4rs::{builder, parser};
 

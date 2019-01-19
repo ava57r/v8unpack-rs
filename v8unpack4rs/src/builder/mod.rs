@@ -1,7 +1,7 @@
 use container::*;
 use std::io::prelude::*;
 use std::io::{Error as ioError, ErrorKind as ioErrorKind, Read, SeekFrom, Write};
-use std::{cmp, fs, path, ffi::OsStr, u32};
+use std::{cmp, ffi::OsStr, fs, path, u32};
 
 #[derive(Debug)]
 struct PackElementEntry {
@@ -51,11 +51,10 @@ pub fn pack_from_folder(dirname: &str, filename_out: &str) -> Result<bool> {
     fs::copy(
         path::Path::new(dirname).join("FileHeader"),
         path::Path::new(filename_out),
-    ).expect("SaveFile. Error in creating file!");
+    )
+    .expect("SaveFile. Error in creating file!");
 
-    let mut file_out = fs::OpenOptions::new()
-        .append(true)
-        .open(filename_out)?;
+    let mut file_out = fs::OpenOptions::new().append(true).open(filename_out)?;
     let pack_elements = prepare_pack_files(dirname)?;
 
     save_elem_addrs(&pack_elements, &mut file_out)?;
