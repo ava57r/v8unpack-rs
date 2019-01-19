@@ -17,7 +17,7 @@ pub type Result<T> = result::Result<T, error::V8Error>;
 pub const V8_DEFAULT_PAGE_SIZE: u32 = 512;
 
 /// Indicates that no further data.
-pub const V8_MAGIC_NUMBER: u32 = 0x7fffffff;
+pub const V8_MAGIC_NUMBER: u32 = 0x7fff_ffff;
 
 /// Trait for to get basic information about the container.
 pub trait V8Container {
@@ -59,7 +59,7 @@ where
     }
 
     fn get_first_block_header(&mut self) -> Result<BlockHeader> {
-        self.set_position(FileHeader::SIZE as u64);
+        self.set_position(u64::from(FileHeader::SIZE));
 
         BlockHeader::from_raw_parts(self)
     }
@@ -91,7 +91,7 @@ impl V8Container for BufReader<fs::File> {
     }
 
     fn get_first_block_header(&mut self) -> Result<BlockHeader> {
-        self.seek(SeekFrom::Start(FileHeader::SIZE as u64))?;
+        self.seek(SeekFrom::Start(u64::from(FileHeader::SIZE)))?;
 
         BlockHeader::from_raw_parts(self)
     }
@@ -113,9 +113,9 @@ impl FileHeader {
 
     pub fn new(next_page_addr: u32, page_size: u32, storage_ver: u32) -> FileHeader {
         FileHeader {
-            next_page_addr: next_page_addr,
-            page_size: page_size,
-            storage_ver: storage_ver,
+            next_page_addr,
+            page_size,
+            storage_ver,
             reserved: 0,
         }
     }
@@ -125,7 +125,7 @@ impl FileHeader {
         R: Read + Seek,
     {
         let mut buf = vec![];
-        let read_bytes = src.take(Self::SIZE as u64).read_to_end(&mut buf)?;
+        let read_bytes = src.take(u64::from(Self::SIZE)).read_to_end(&mut buf)?;
         if read_bytes < Self::SIZE as usize {
             return Err(error::V8Error::IoError(ioError::new(
                 ioErrorKind::InvalidData,
@@ -206,19 +206,20 @@ impl fmt::Display for BlockHeader {
     }
 }
 
+fn convert(value: u32) -> [u8; 8] {
+    let hex = format!("{:08x}", value);
+    let bytes = hex.into_bytes();
+    let arr: [u8; 8] = clone_into_array(&bytes[0..8]);
+
+    arr
+}
+
 impl BlockHeader {
     /// The size of the data in the file, represented as C structures.
     pub const SIZE: u32 = 1 + 1 + 8 + 1 + 8 + 1 + 8 + 1 + 1 + 1;
 
     pub fn new(data_size: u32, page_size: u32, next_page_addr: u32) -> BlockHeader {
         let mut default = BlockHeader::default();
-        let convert = |value| {
-            let hex = format!("{:08x}", value);
-            let bytes = hex.into_bytes();
-            let arr: [u8; 8] = clone_into_array(&bytes[0..8]);
-
-            arr
-        };
 
         default.data_size_hex = convert(data_size);
         default.page_size_hex = convert(page_size);
@@ -232,7 +233,7 @@ impl BlockHeader {
         R: Read + Seek,
     {
         let mut buf = vec![];
-        let read_bytes = src.take(Self::SIZE as u64).read_to_end(&mut buf)?;
+        let read_bytes = src.take(u64::from(Self::SIZE)).read_to_end(&mut buf)?;
         if read_bytes < Self::SIZE as usize {
             return Err(error::V8Error::IoError(ioError::new(
                 ioErrorKind::InvalidData,
@@ -346,8 +347,8 @@ impl ElemAddr {
     /// Creates a new instance of `ElemAddr`.
     pub fn new(elem_data_addr: u32, elem_header_addr: u32) -> Self {
         ElemAddr {
-            elem_header_addr: elem_header_addr,
-            elem_data_addr: elem_data_addr,
+            elem_header_addr,
+            elem_data_addr,
             fffffff: V8_MAGIC_NUMBER,
         }
     }
@@ -393,7 +394,7 @@ impl ElemHeaderBegin {
 }
 
 /// Describes the structure of the data item container.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct V8Elem {
     header: Vec<u8>,
     data: Option<Vec<u8>>,
@@ -404,12 +405,7 @@ pub struct V8Elem {
 impl V8Elem {
     /// Creates a new instance of `V8Elem`.
     pub fn new() -> V8Elem {
-        V8Elem {
-            header: vec![],
-            data: None,
-            unpacked_data: None,
-            is_v8file: false,
-        }
+        V8Elem::default()
     }
 
     pub fn with_header(mut self, value: Vec<u8>) -> Self {
@@ -429,10 +425,7 @@ impl V8Elem {
     }
 
     pub fn get_data(&self) -> Option<&Vec<u8>> {
-        match self.data {
-            Some(ref d) => Some(d),
-            None => None,
-        }
+        self.data.as_ref()
     }
 
     pub fn set_data(&mut self, value: Option<Vec<u8>>) {
@@ -470,10 +463,8 @@ impl V8Elem {
         let mut v_raw_name: Vec<u8> = vec![];
 
         for (i, ch) in raw_name.iter().enumerate() {
-            if i % 2 == 0 {
-                if *ch != b'\0' {
-                    v_raw_name.push(*ch);
-                }
+            if i % 2 == 0 && *ch != b'\0' {
+                v_raw_name.push(*ch);
             }
         }
 
@@ -527,7 +518,7 @@ impl V8Elem {
 }
 
 /// Describes the structure of the file `1cd`.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct V8File {
     /// The file header `1cd`.
     file_header: FileHeader,
@@ -541,11 +532,7 @@ pub struct V8File {
 impl V8File {
     /// Creates a new instance of `V8File`.
     pub fn new() -> V8File {
-        V8File {
-            file_header: FileHeader::default(),
-            elems_addrs: vec![],
-            elems: vec![],
-        }
+        V8File::default()
     }
 
     pub fn with_header(mut self, value: FileHeader) -> Self {
@@ -582,10 +569,8 @@ impl V8File {
                     let mut filename_out = fs::File::create(out_path.as_path())?;
                     filename_out.write_all(out_data)?;
                 }
-            } else {
-                if let Some(out_file) = elem.unpacked_data.as_ref() {
-                    out_file.save_file_to_folder(&out_path)?;
-                }
+            } else if let Some(out_file) = elem.unpacked_data.as_ref() {
+                out_file.save_file_to_folder(&out_path)?;
             }
         }
 
@@ -721,7 +706,7 @@ impl V8File {
 
     fn save_block_data_to_buffer(
         buffer: &mut Vec<u8>,
-        block_data: &Vec<u8>,
+        block_data: &[u8],
         page_size: u32,
     ) -> Result<()> {
         if block_data.len() > u32::MAX as usize {

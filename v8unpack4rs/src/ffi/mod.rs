@@ -20,7 +20,7 @@ pub unsafe extern "C" fn parse_cf(
         let file_name = get_string(pfile_name).unwrap();
         let dir_name = get_string(pdir_name).unwrap();
 
-        return unpack_to_directory_no_load(&file_name, &dir_name, true, true).unwrap();
+        unpack_to_directory_no_load(&file_name, &dir_name, true, true).unwrap()
     });
 
     if result.is_err() {
@@ -28,5 +28,5 @@ pub unsafe extern "C" fn parse_cf(
         return false;
     }
 
-    return true;
+    true
 }

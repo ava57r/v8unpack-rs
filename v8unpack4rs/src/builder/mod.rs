@@ -64,7 +64,7 @@ pub fn pack_from_folder(dirname: &str, filename_out: &str) -> Result<bool> {
 }
 
 fn save_elem_addrs(
-    pack_elems: &Vec<PackElementEntry>,
+    pack_elems: &[PackElementEntry],
     file_out: &mut fs::File,
 ) -> Result<()> {
     let mut elem_addrs_bytes: Vec<u8> =
@@ -78,14 +78,14 @@ fn save_elem_addrs(
 
     for pack_elem in pack_elems {
         let elem_header_addr = cur_elem_addr;
-        if pack_elem.header_size > u32::MAX as u64 {
+        if pack_elem.header_size > u64::from(u32::MAX) {
             ioError::new(ioErrorKind::InvalidData, "Invalid header length");
         }
         cur_elem_addr += BlockHeader::SIZE + pack_elem.header_size as u32;
 
         let elem_data_addr = cur_elem_addr;
         cur_elem_addr += BlockHeader::SIZE;
-        if pack_elem.data_size > u32::MAX as u64 {
+        if pack_elem.data_size > u64::from(u32::MAX) {
             ioError::new(ioErrorKind::InvalidData, "Invalid data length");
         }
         cur_elem_addr += cmp::max(pack_elem.data_size as u32, V8_DEFAULT_PAGE_SIZE);
@@ -120,7 +120,7 @@ fn save_data(pack_elems: Vec<PackElementEntry>, file_out: &mut fs::File) -> Resu
 
 fn save_block_data(
     file_out: &mut fs::File,
-    block_data: &Vec<u8>,
+    block_data: &[u8],
     page_size: u32,
 ) -> Result<usize> {
     if block_data.len() > u32::MAX as usize {
@@ -152,7 +152,7 @@ fn save_block_data(
 fn write_terminal_zeros(file_out: &mut fs::File, count: u32) -> Result<()> {
     let mut i = 0;
     while i < count {
-        file_out.write(b"\0")?;
+        file_out.write_all(b"\0")?;
         i += 1;
     }
 
@@ -165,10 +165,7 @@ pub fn build_cf_file(
     no_deflate: bool,
 ) -> Result<bool> {
     let elems_num: u32 = fs::read_dir(dirname)?
-        .filter(|p| match p {
-            Ok(_) => true,
-            Err(_) => false,
-        })
+        .filter(|p| p.is_ok())
         .fold(0, |sum, _| sum + 1);
     let mut toc: Vec<ElemAddr> = Vec::with_capacity(elems_num as usize);
     let mut cur_block_addr = FileHeader::SIZE + BlockHeader::SIZE;
