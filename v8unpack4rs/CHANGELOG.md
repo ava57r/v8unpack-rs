@@ -1,3 +1,7 @@
+## 0.3.0 (2019-01-19)
+
+* Update dependencies and used Rust 2018 edition
+
 ## 0.2.1 (2018-05-30)
 
 * Added build container from source folder
