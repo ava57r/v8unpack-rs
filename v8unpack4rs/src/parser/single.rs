@@ -286,8 +286,6 @@ where
 }
 
 pub fn try_inflate_bytes(input: Vec<u8>) -> Vec<u8> {
-    use inflate;
-
     match inflate::inflate_bytes(&input) {
         Ok(inf_bytes) => inf_bytes,
         Err(_) => input,
