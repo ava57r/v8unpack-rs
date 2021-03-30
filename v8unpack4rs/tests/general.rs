@@ -27,7 +27,7 @@ fn test_parse_and_build() {
     ) {
         Ok(b) => b,
         Err(e) => {
-            panic!(e.to_string());
+            panic!("{}", e);
         }
     };
 
@@ -39,7 +39,7 @@ fn test_parse_and_build() {
 
     let build_ok = match builder::build_cf_file(unpack, build_file, false) {
         Ok(b) => b,
-        Err(e) => panic!(e.to_string()),
+        Err(e) => panic!("{}", e),
     };
 
     assert!(build_ok);
@@ -50,7 +50,7 @@ fn test_parse_and_build() {
         match parser::unpack_to_directory_no_load(build_file, unpack2, true, true) {
             Ok(b) => b,
             Err(e) => {
-                panic!(e.to_string());
+                panic!("{}", e);
             }
         };
 
